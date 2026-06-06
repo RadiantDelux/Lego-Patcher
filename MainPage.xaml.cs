@@ -64,8 +64,10 @@ public partial class MainPage : ContentPage
             BodyGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Star });
 
             Grid.SetRow(PadScroll, 0); Grid.SetColumn(PadScroll, 0);
+            LibPanel.IsVisible = true;
             LibPanel.TranslationY = 0;
             LibPanel.Margin = 0;
+            LibPanel.HeightRequest = -1;       // auto-fill column
             LibPanel.VerticalOptions = LayoutOptions.Fill;
             LibPanel.HorizontalOptions = LayoutOptions.Fill;
             BodyGrid.Add(LibPanel, 1, 0);
@@ -222,6 +224,20 @@ public partial class MainPage : ContentPage
             Margin = new Thickness(8, 6, 0, 0), InputTransparent = true,
         };
 
+        // Remove (X) button, top-right, visible only when slot is filled.
+        var removeBtn = new Button
+        {
+            Text = "✕", FontSize = 12, FontAttributes = FontAttributes.Bold,
+            TextColor = Color.FromArgb("#ff8a8a"),
+            BackgroundColor = Color.FromArgb("#aa1a1020"),
+            CornerRadius = 11, Padding = 0,
+            WidthRequest = 22, HeightRequest = 22,
+            HorizontalOptions = LayoutOptions.End, VerticalOptions = LayoutOptions.Start,
+            Margin = new Thickness(0, 4, 4, 0),
+        };
+        removeBtn.SetBinding(IsVisibleProperty, new Binding(nameof(SlotVm.Filled)));
+        removeBtn.Clicked += async (_, _) => await RemoveSlotAsync(id);
+
         var stack = new VerticalStackLayout
         {
             Spacing = 4, Padding = 8,
@@ -230,7 +246,7 @@ public partial class MainPage : ContentPage
             Children = { img, nameLabel },
         };
 
-        var inner = new Grid { InputTransparent = true, Children = { stack, tagLabel } };
+        var inner = new Grid { InputTransparent = false, Children = { stack, tagLabel, removeBtn } };
 
         var border = new Border
         {
@@ -297,28 +313,35 @@ public partial class MainPage : ContentPage
     async void OnSlotTapped(string id)
     {
         var vm = _slots[id];
-        if (vm.Filled)
+        // Selecting any slot (filled or empty) targets it for the next figure.
+        // Removing is done with the slot's ✕ button.
+        _selectedSlot = (_selectedSlot == id) ? null : id;
+        RefreshAllSlotVisuals();
+
+        // In portrait, open the figure sheet when a slot gets selected,
+        // close it when deselected.
+        if (!_isWide)
         {
-            // tap filled slot -> remove
-            if (!await EnsureConnectedAsync()) return;
-            try
-            {
-                await _ps3.RemoveAsync(id);
-                vm.Clear();
-                if (_selectedSlot == id) _selectedSlot = null;
-                RefreshAllSlotVisuals();
-            }
-            catch (Exception ex) { await Toast($"Error: {ex.Message}"); }
+            if (_selectedSlot is not null && !_sheetOpen) OnOpenSheet(this, EventArgs.Empty);
+            else if (_selectedSlot is null && _sheetOpen) OnCloseSheet(this, EventArgs.Empty);
         }
-        else
+        await Task.CompletedTask;
+    }
+
+    async Task RemoveSlotAsync(string id)
+    {
+        var vm = _slots[id];
+        if (!vm.Filled) return;
+        if (!await EnsureConnectedAsync()) return;
+        try
         {
-            // select empty slot, waiting for a figure tap
-            _selectedSlot = (_selectedSlot == id) ? null : id;
+            await _ps3.RemoveAsync(id);
+            vm.Clear();
+            if (_selectedSlot == id) _selectedSlot = null;
             RefreshAllSlotVisuals();
-            // In portrait, opening the figure sheet right away speeds up the flow.
-            if (!_isWide && _selectedSlot is not null && !_sheetOpen)
-                OnOpenSheet(this, EventArgs.Empty);
+            await Toast($"Quitada de {id}");
         }
+        catch (Exception ex) { await Toast($"Error: {ex.Message}"); }
     }
 
     void RefreshAllSlotVisuals()
