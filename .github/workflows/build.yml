@@ -79,31 +79,28 @@ jobs:
           path: 'bin/Release/net10.0-windows10.0.19041.0/**'
           if-no-files-found: warn
 
-  # ------------------------------------------------------------ iOS / macOS
-  # NOTE: .NET 10 MAUI iOS/macOS workloads currently require a newer Xcode
-  # than the GitHub macOS runners provide (workload wants 26.5, runner has
-  # 26.3). Until the runners update, this job is allowed to fail without
-  # blocking the Android/Windows artifacts. It will start passing on its own
-  # once the runner ships the required Xcode.
-  apple:
+  # ------------------------------------------------------------------- iOS
+  # macOS build dropped (only iOS wanted). The .NET iOS workload may require a
+  # newer Xcode than the runner ships; we pick the newest Xcode available and
+  # let the job soft-fail if there's still a mismatch.
+  ios:
     runs-on: macos-15
     continue-on-error: true
     steps:
       - uses: actions/checkout@v4
-      - name: Select Xcode
+      - name: List installed Xcodes
+        run: ls -1 /Applications | grep -i xcode || true
+      - name: Select newest Xcode
         uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: latest-stable
+          xcode-version: latest
       - name: Show Xcode version
         run: xcodebuild -version
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
-      - name: Install MAUI Apple workloads
-        run: dotnet workload install maui-ios maui-maccatalyst
-
-      # iOS — unsigned .ipa. Install requires your own signing later
-      # (AltStore / free Apple dev cert / paid account).
+      - name: Install MAUI iOS workload
+        run: dotnet workload install maui-ios
       - name: Build iOS (Release, unsigned)
         run: >
           dotnet publish ${{ env.PROJECT }}
@@ -119,19 +116,4 @@ jobs:
         with:
           name: legopatcher-ios-unsigned
           path: '**/*.ipa'
-          if-no-files-found: warn
-
-      # macOS (Mac Catalyst) — .app bundle, unsigned.
-      - name: Build MacCatalyst (Release)
-        run: >
-          dotnet publish ${{ env.PROJECT }}
-          -c Release -f net10.0-maccatalyst
-          -p:TargetFrameworks=net10.0-maccatalyst
-          -p:CreatePackage=false
-          -p:EnableCodeSigning=false
-      - name: Upload macOS .app
-        uses: actions/upload-artifact@v4
-        with:
-          name: legopatcher-macos
-          path: '**/bin/Release/net10.0-maccatalyst/**/*.app'
           if-no-files-found: warn
