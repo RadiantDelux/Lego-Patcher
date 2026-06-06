@@ -13,34 +13,37 @@
 
         <Grid RowDefinitions="Auto,*" Padding="0">
 
-            <!-- Topbar -->
-            <Grid Row="0" Padding="14,12" ColumnDefinitions="*,Auto,*"
-                  BackgroundColor="#d90e0d18">
-                <Image Grid.Column="1" x:Name="LogoImage" HeightRequest="64"
+            <!-- Topbar: logo + horizontally scrollable actions -->
+            <Grid Row="0" Padding="10,8" RowDefinitions="Auto,Auto" RowSpacing="6"
+                  BackgroundColor="#e60e0d18">
+                <Image Grid.Row="0" x:Name="LogoImage" HeightRequest="48"
                        Aspect="AspectFit" HorizontalOptions="Center" />
-                <HorizontalStackLayout Grid.Column="2" Spacing="6"
-                                       HorizontalOptions="End" VerticalOptions="Center">
-                    <Ellipse x:Name="ConnDot" WidthRequest="10" HeightRequest="10"
-                             Fill="#555" VerticalOptions="Center" />
-                    <Label x:Name="ConnText" Text="sin conexión" TextColor="#8a8aa0"
-                           FontSize="12" VerticalOptions="Center" Margin="0,0,6,0" />
-                    <Button Text="¿Qué es?" Clicked="OnAbout" Style="{StaticResource Ghost}" />
-                    <Button Text="Importar" Clicked="OnImport" Style="{StaticResource Ghost}" />
-                    <Button Text="Instalar PS3" Clicked="OnInstall" Style="{StaticResource Primary}" />
-                    <Button Text="Conectar" Clicked="OnConnect" Style="{StaticResource Ghost}" />
-                    <Button Text="Créditos" Clicked="OnCredits" Style="{StaticResource Ghost}" />
-                </HorizontalStackLayout>
+                <ScrollView Grid.Row="1" Orientation="Horizontal"
+                            HorizontalScrollBarVisibility="Never">
+                    <HorizontalStackLayout Spacing="6" Padding="4,0"
+                                           HorizontalOptions="Center">
+                        <Ellipse x:Name="ConnDot" WidthRequest="10" HeightRequest="10"
+                                 Fill="#555" VerticalOptions="Center" />
+                        <Label x:Name="ConnText" Text="sin conexión" TextColor="#8a8aa0"
+                               FontSize="12" VerticalOptions="Center" Margin="0,0,6,0" />
+                        <Button Text="¿Qué es?" Clicked="OnAbout" Style="{StaticResource Ghost}" />
+                        <Button Text="Importar" Clicked="OnImport" Style="{StaticResource Ghost}" />
+                        <Button Text="Instalar PS3" Clicked="OnInstall" Style="{StaticResource Primary}" />
+                        <Button Text="Conectar" Clicked="OnConnect" Style="{StaticResource Ghost}" />
+                        <Button Text="Créditos" Clicked="OnCredits" Style="{StaticResource Ghost}" />
+                    </HorizontalStackLayout>
+                </ScrollView>
             </Grid>
 
-            <!-- Body: pad + library -->
-            <Grid Row="1" ColumnDefinitions="*,*" Padding="16" ColumnSpacing="16">
+            <!-- Body: responsive (set by code-behind on size change) -->
+            <Grid Row="1" x:Name="BodyGrid" Padding="12" RowSpacing="12" ColumnSpacing="12">
 
-                <!-- Toy pad -->
-                <ScrollView Grid.Column="0">
+                <!-- Toy pad panel -->
+                <ScrollView x:Name="PadScroll">
                     <VerticalStackLayout Spacing="12">
                         <Border StrokeShape="RoundRectangle 6"
-                                Stroke="#2c2c38" BackgroundColor="#181820" Padding="20">
-                            <Grid ColumnDefinitions="*,*,*" ColumnSpacing="14">
+                                Stroke="#2c2c38" BackgroundColor="#181820" Padding="16">
+                            <Grid ColumnDefinitions="*,*,*" ColumnSpacing="10">
 
                                 <VerticalStackLayout Grid.Column="0" Spacing="8">
                                     <Label Text="IZQUIERDA" TextColor="#8a8aa0"
@@ -67,7 +70,7 @@
                             </Grid>
                         </Border>
 
-                        <HorizontalStackLayout Spacing="8" HorizontalOptions="End">
+                        <HorizontalStackLayout Spacing="8" HorizontalOptions="Center">
                             <Button Text="↻ Sincronizar" Clicked="OnSync" Style="{StaticResource Ghost}" />
                             <Button Text="Limpiar todo" Clicked="OnClear" Style="{StaticResource Danger}" />
                         </HorizontalStackLayout>
@@ -79,16 +82,19 @@
                     </VerticalStackLayout>
                 </ScrollView>
 
-                <!-- Library -->
-                <Border Grid.Column="1" StrokeShape="RoundRectangle 6"
-                        Stroke="#2c2c38" BackgroundColor="#181820" Padding="16">
+                <!-- Library panel -->
+                <Border x:Name="LibPanel" StrokeShape="RoundRectangle 6"
+                        Stroke="#2c2c38" BackgroundColor="#181820" Padding="12">
                     <Grid RowDefinitions="Auto,Auto,*" RowSpacing="10">
-                        <HorizontalStackLayout Grid.Row="0" Spacing="4">
-                            <Button x:Name="CatAll" Text="Todos" Clicked="OnCat" Style="{StaticResource Cat}" />
-                            <Button x:Name="CatChar" Text="Personajes" Clicked="OnCat" Style="{StaticResource Cat}" />
-                            <Button x:Name="CatVeh" Text="Vehículos" Clicked="OnCat" Style="{StaticResource Cat}" />
-                            <Button x:Name="CatGad" Text="Gadgets" Clicked="OnCat" Style="{StaticResource Cat}" />
-                        </HorizontalStackLayout>
+                        <ScrollView Grid.Row="0" Orientation="Horizontal"
+                                    HorizontalScrollBarVisibility="Never">
+                            <HorizontalStackLayout Spacing="4">
+                                <Button x:Name="CatAll" Text="Todos" Clicked="OnCat" Style="{StaticResource Cat}" />
+                                <Button x:Name="CatChar" Text="Personajes" Clicked="OnCat" Style="{StaticResource Cat}" />
+                                <Button x:Name="CatVeh" Text="Vehículos" Clicked="OnCat" Style="{StaticResource Cat}" />
+                                <Button x:Name="CatGad" Text="Gadgets" Clicked="OnCat" Style="{StaticResource Cat}" />
+                            </HorizontalStackLayout>
+                        </ScrollView>
 
                         <SearchBar Grid.Row="1" x:Name="SearchBox"
                                    Placeholder="Buscar (Batman, TARDIS, ...)"
@@ -97,7 +103,7 @@
 
                         <ScrollView Grid.Row="2">
                             <FlexLayout x:Name="LibLayout" Wrap="Wrap"
-                                        JustifyContent="Start" AlignItems="Start" />
+                                        JustifyContent="Center" AlignItems="Start" />
                         </ScrollView>
                     </Grid>
                 </Border>

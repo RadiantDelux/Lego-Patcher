@@ -27,11 +27,50 @@ public partial class MainPage : ContentPage
         _ps3 = ps3;
         _lib = lib;
         BuildSlots();
+        SizeChanged += OnPageSizeChanged;
         _ = InitAsync();
+    }
+
+    bool _isWide = true;
+    void OnPageSizeChanged(object? sender, EventArgs e)
+    {
+        if (Width <= 0) return;
+        bool wide = Width >= Height;          // landscape / desktop
+        if (wide == _isWide && BodyGrid.ColumnDefinitions.Count > 0) return;
+        _isWide = wide;
+        ApplyLayout(wide);
+    }
+
+    void ApplyLayout(bool wide)
+    {
+        BodyGrid.RowDefinitions.Clear();
+        BodyGrid.ColumnDefinitions.Clear();
+
+        if (wide)
+        {
+            // pad | library  (two columns)
+            BodyGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1.1, GridUnitType.Star) });
+            BodyGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            BodyGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Star });
+
+            Grid.SetRow(PadScroll, 0); Grid.SetColumn(PadScroll, 0);
+            Grid.SetRow(LibPanel, 0); Grid.SetColumn(LibPanel, 1);
+        }
+        else
+        {
+            // pad on top, library below (two rows)
+            BodyGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            BodyGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Star });
+            BodyGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Star });
+
+            Grid.SetRow(PadScroll, 0); Grid.SetColumn(PadScroll, 0);
+            Grid.SetRow(LibPanel, 1); Grid.SetColumn(LibPanel, 0);
+        }
     }
 
     async Task InitAsync()
     {
+        ApplyLayout(true);   // default wide; SizeChanged adjusts to portrait
         await LoadImagesAsync();
         await _lib.LoadAsync();
         RenderLibrary();
@@ -95,9 +134,9 @@ public partial class MainPage : ContentPage
         var vm = new SlotVm { Id = id, Tag = tag };
         _slots[id] = vm;
 
-        double size = center ? 150 : 130;
+        double size = center ? 96 : 88;
 
-        var img = new Image { Aspect = Aspect.AspectFit, WidthRequest = size * 0.78, HeightRequest = size * 0.6, InputTransparent = true };
+        var img = new Image { Aspect = Aspect.AspectFit, WidthRequest = size * 0.78, HeightRequest = size * 0.55, InputTransparent = true };
         img.SetBinding(Image.SourceProperty, new Binding(nameof(SlotVm.Thumb)));
         img.SetBinding(IsVisibleProperty, new Binding(nameof(SlotVm.HasThumb)));
 
@@ -130,7 +169,8 @@ public partial class MainPage : ContentPage
 
         var border = new Border
         {
-            WidthRequest = size, HeightRequest = size,
+            HeightRequest = size, MinimumWidthRequest = 70, MaximumWidthRequest = size,
+            HorizontalOptions = LayoutOptions.Fill,
             StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = 6 },
             Stroke = Color.FromArgb("#3c3c4d"), StrokeThickness = 1,
             BackgroundColor = Color.FromArgb("#59000000"),
