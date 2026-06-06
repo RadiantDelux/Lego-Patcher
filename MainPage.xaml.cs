@@ -776,8 +776,15 @@ public partial class MainPage : ContentPage
             // Per-platform file type filter so the picker allows .zip.
             var zipType = new FilePickerFileType(new Dictionary<DevicePlatform, IEnumerable<string>>
             {
-                [DevicePlatform.iOS]      = new[] { "public.zip-archive", "public.archive" },
-                [DevicePlatform.macOS]    = new[] { "public.zip-archive", "zip" },
+                // iOS UTType identifiers. Different sources tag zips differently,
+                // so accept the common ones plus generic data/archive to avoid
+                // the file appearing greyed-out in the picker.
+                [DevicePlatform.iOS]      = new[]
+                {
+                    "public.zip-archive", "com.pkware.zip-archive",
+                    "public.archive", "public.data", "public.item",
+                },
+                [DevicePlatform.macOS]    = new[] { "public.zip-archive", "zip", "public.data" },
                 [DevicePlatform.Android]  = new[] { "application/zip", "application/octet-stream", "*/*" },
                 [DevicePlatform.WinUI]    = new[] { ".zip" },
             });
