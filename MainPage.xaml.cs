@@ -142,6 +142,19 @@ public partial class MainPage : ContentPage
         await _lib.LoadAsync();
         RenderLibrary();
         SelectCat(CatAll, "all");
+    }
+
+    bool _firstRunDone;
+    protected override async void OnAppearing()
+    {
+        base.OnAppearing();
+        if (_firstRunDone) return;
+        _firstRunDone = true;
+
+        // iOS will not show alerts launched from the constructor/InitAsync
+        // (page not yet on screen). Run the first-run prompts here, and give
+        // the UI one frame to settle.
+        await Task.Delay(300);
 
         if (!_lib.HasFigures)
         {
@@ -739,18 +752,27 @@ public partial class MainPage : ContentPage
                 var status = await Permissions.CheckStatusAsync<Permissions.StorageRead>();
                 if (status != PermissionStatus.Granted)
                     status = await Permissions.RequestAsync<Permissions.StorageRead>();
-                // If denied we still try; SAF stream may work regardless.
             }
+
+            // Per-platform file type filter so the picker allows .zip.
+            var zipType = new FilePickerFileType(new Dictionary<DevicePlatform, IEnumerable<string>>
+            {
+                [DevicePlatform.iOS]      = new[] { "public.zip-archive", "public.archive" },
+                [DevicePlatform.macOS]    = new[] { "public.zip-archive", "zip" },
+                [DevicePlatform.Android]  = new[] { "application/zip", "application/octet-stream", "*/*" },
+                [DevicePlatform.WinUI]    = new[] { ".zip" },
+            });
 
             var result = await FilePicker.Default.PickAsync(new PickOptions
             {
                 PickerTitle = "Selecciona tu Dimensions.zip",
+                FileTypes = zipType,
             });
             if (result is null) return;
 
             await Toast("Importando...");
 
-            // Read via the SAF stream (avoids needing the raw file path).
+            // Read via the SAF/stream API (avoids needing the raw file path).
             using var ms = new MemoryStream();
             using (var stream = await result.OpenReadAsync())
                 await stream.CopyToAsync(ms);
