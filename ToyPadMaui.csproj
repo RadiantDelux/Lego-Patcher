@@ -49,7 +49,7 @@
 
 	<ItemGroup>
 		<!-- App Icon -->
-		<MauiIcon Include="Resources\AppIcon\legopatcher_icon.png" />
+		<MauiIcon Include="Resources\AppIcon\appicon.png" />
 
 
 		<!-- Splash Screen -->
