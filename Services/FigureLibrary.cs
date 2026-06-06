@@ -3,12 +3,24 @@ using ToyPadMaui.Models;
 
 namespace ToyPadMaui.Services;
 
-// Stores imported .bin dumps in app data (never bundled). Resolves thumbnails
-// from embedded Raw assets. The game .bin files are user-supplied.
+// Stores imported .bin dumps. On platforms that expose the app's Documents
+// folder (iOS with UIFileSharingEnabled), they live in
+// Documents/Dimensions/{Characters,Vehicles,Gadgets} so the user can see and
+// manage them in the Files app. Elsewhere it falls back to app data.
 public class FigureLibrary
 {
-    readonly string _binDir =
-        Path.Combine(FileSystem.AppDataDirectory, "figures");
+    static string RootDir
+    {
+        get
+        {
+            // MyDocuments maps to the app's visible Documents dir on iOS.
+            var docs = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+            if (string.IsNullOrEmpty(docs)) docs = FileSystem.AppDataDirectory;
+            return docs;
+        }
+    }
+
+    readonly string _binDir = Path.Combine(RootDir, "Dimensions");
 
     public List<Figure> Figures { get; private set; } = [];
 
