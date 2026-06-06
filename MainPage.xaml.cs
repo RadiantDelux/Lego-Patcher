@@ -773,6 +773,13 @@ public partial class MainPage : ContentPage
                     status = await Permissions.RequestAsync<Permissions.StorageRead>();
             }
 
+            // iOS: let any dismissing modal (the prompt alert) finish its
+            // animation before presenting the document picker, otherwise the
+            // picker shows but taps don't register / can't select.
+            if (DeviceInfo.Platform == DevicePlatform.iOS
+                || DeviceInfo.Platform == DevicePlatform.macOS)
+                await Task.Delay(400);
+
             // File type filter. On iOS we deliberately DON'T restrict types:
             // passing specific UTIs greys out zips coming from iCloud/Drive/
             // other providers. We allow everything and validate it's a real
@@ -793,7 +800,11 @@ public partial class MainPage : ContentPage
                 options = new PickOptions { PickerTitle = "Selecciona tu Dimensions.zip", FileTypes = zipType };
             }
 
-            var result = await FilePicker.Default.PickAsync(options);
+            FileResult? result = null;
+            await MainThread.InvokeOnMainThreadAsync(async () =>
+            {
+                result = await FilePicker.Default.PickAsync(options);
+            });
             if (result is null) return;
 
             await Toast("Importando...");
