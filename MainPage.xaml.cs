@@ -32,10 +32,12 @@ public partial class MainPage : ContentPage
     }
 
     bool _isWide = true;
+    bool _sheetOpen;
+
     void OnPageSizeChanged(object? sender, EventArgs e)
     {
         if (Width <= 0) return;
-        bool wide = Width >= Height;          // landscape / desktop
+        bool wide = Width >= Height;
         if (wide == _isWide && BodyGrid.ColumnDefinitions.Count > 0) return;
         _isWide = wide;
         ApplyLayout(wide);
@@ -46,26 +48,89 @@ public partial class MainPage : ContentPage
         BodyGrid.RowDefinitions.Clear();
         BodyGrid.ColumnDefinitions.Clear();
 
+        // Detach LibPanel from whatever parent it's in.
+        if (LibPanel.Parent is Grid pg) pg.Children.Remove(LibPanel);
+
         if (wide)
         {
-            // pad | library  (two columns)
+            // Docked beside the pad. Hide sheet chrome.
+            SheetHandle.IsVisible = false;
+            FabFiguras.IsVisible = false;
+            Scrim.IsVisible = false;
+            _sheetOpen = false;
+
             BodyGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1.1, GridUnitType.Star) });
             BodyGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             BodyGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Star });
 
             Grid.SetRow(PadScroll, 0); Grid.SetColumn(PadScroll, 0);
-            Grid.SetRow(LibPanel, 0); Grid.SetColumn(LibPanel, 1);
+            LibPanel.TranslationY = 0;
+            LibPanel.Margin = 0;
+            LibPanel.VerticalOptions = LayoutOptions.Fill;
+            LibPanel.HorizontalOptions = LayoutOptions.Fill;
+            BodyGrid.Add(LibPanel, 1, 0);
         }
         else
         {
-            // pad on top, library below (two rows)
-            BodyGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            BodyGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Star });
-            BodyGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Star });
+            // Pad fills the body; library becomes a bottom sheet overlay.
+            SheetHandle.IsVisible = true;
+            FabFiguras.IsVisible = true;
 
+            BodyGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Star });
+            BodyGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Star });
             Grid.SetRow(PadScroll, 0); Grid.SetColumn(PadScroll, 0);
-            Grid.SetRow(LibPanel, 1); Grid.SetColumn(LibPanel, 0);
+
+            // Sheet covers ~75% of height, anchored to bottom, hidden below screen.
+            LibPanel.VerticalOptions = LayoutOptions.End;
+            LibPanel.HorizontalOptions = LayoutOptions.Fill;
+            LibPanel.HeightRequest = Math.Max(320, Height * 0.72);
+            LibPanel.Margin = new Thickness(6, 0, 6, 0);
+            RootGrid.Add(LibPanel);
+            // Ensure scrim + sheet are on top.
+            RootGrid.Children.Remove(Scrim);
+            RootGrid.Add(Scrim);
+            RootGrid.Children.Remove(LibPanel);
+            RootGrid.Add(LibPanel);
+            RootGrid.Children.Remove(FabFiguras);
+            RootGrid.Add(FabFiguras);
+
+            CloseSheetInstant();
         }
+    }
+
+    void CloseSheetInstant()
+    {
+        _sheetOpen = false;
+        LibPanel.TranslationY = Math.Max(360, Height);
+        LibPanel.IsVisible = false;
+        Scrim.IsVisible = false;
+        Scrim.Opacity = 0;
+        FabFiguras.IsVisible = !_isWide;
+    }
+
+    async void OnOpenSheet(object? sender, EventArgs e)
+    {
+        if (_isWide) return;
+        _sheetOpen = true;
+        LibPanel.IsVisible = true;
+        Scrim.IsVisible = true;
+        FabFiguras.IsVisible = false;
+        LibPanel.TranslationY = LibPanel.HeightRequest;
+        var t1 = Scrim.FadeTo(0.55, 200);
+        var t2 = LibPanel.TranslateTo(0, 0, 250, Easing.CubicOut);
+        await Task.WhenAll(t1, t2);
+    }
+
+    async void OnCloseSheet(object? sender, EventArgs e)
+    {
+        if (_isWide) { return; }
+        var t1 = Scrim.FadeTo(0, 200);
+        var t2 = LibPanel.TranslateTo(0, LibPanel.HeightRequest, 250, Easing.CubicIn);
+        await Task.WhenAll(t1, t2);
+        _sheetOpen = false;
+        LibPanel.IsVisible = false;
+        Scrim.IsVisible = false;
+        FabFiguras.IsVisible = true;
     }
 
     async Task InitAsync()
@@ -250,6 +315,9 @@ public partial class MainPage : ContentPage
             // select empty slot, waiting for a figure tap
             _selectedSlot = (_selectedSlot == id) ? null : id;
             RefreshAllSlotVisuals();
+            // In portrait, opening the figure sheet right away speeds up the flow.
+            if (!_isWide && _selectedSlot is not null && !_sheetOpen)
+                OnOpenSheet(this, EventArgs.Empty);
         }
     }
 
@@ -276,6 +344,7 @@ public partial class MainPage : ContentPage
             _selectedSlot = null;
             RefreshAllSlotVisuals();
             await Toast($"{f.Name} → {slot}");
+            if (!_isWide && _sheetOpen) OnCloseSheet(this, EventArgs.Empty);
         }
         catch (Exception ex)
         {

@@ -6,7 +6,7 @@
              Shell.NavBarIsVisible="False"
              BackgroundColor="#0e0d12">
 
-    <Grid>
+    <Grid x:Name="RootGrid">
         <!-- Wallpaper background -->
         <Image x:Name="BgImage" Aspect="AspectFill" Opacity="1" />
         <BoxView Color="#0e0d12" Opacity="0.45" />
@@ -35,23 +35,20 @@
                 </ScrollView>
             </Grid>
 
-            <!-- Body: responsive (set by code-behind on size change) -->
+            <!-- Body: pad (+ library on the side in landscape) -->
             <Grid Row="1" x:Name="BodyGrid" Padding="12" RowSpacing="12" ColumnSpacing="12">
 
-                <!-- Toy pad panel -->
                 <ScrollView x:Name="PadScroll">
                     <VerticalStackLayout Spacing="12">
                         <Border StrokeShape="RoundRectangle 6"
                                 Stroke="#2c2c38" BackgroundColor="#181820" Padding="16">
                             <Grid ColumnDefinitions="*,*,*" ColumnSpacing="10">
-
                                 <VerticalStackLayout Grid.Column="0" Spacing="8">
                                     <Label Text="IZQUIERDA" TextColor="#8a8aa0"
                                            FontSize="11" FontAttributes="Bold"
                                            HorizontalOptions="Center" />
                                     <VerticalStackLayout x:Name="ZoneL" Spacing="10" />
                                 </VerticalStackLayout>
-
                                 <VerticalStackLayout Grid.Column="1" Spacing="8"
                                                      VerticalOptions="Center">
                                     <Label Text="CENTRO" TextColor="#f5c518"
@@ -59,14 +56,12 @@
                                            HorizontalOptions="Center" />
                                     <VerticalStackLayout x:Name="ZoneC" Spacing="10" />
                                 </VerticalStackLayout>
-
                                 <VerticalStackLayout Grid.Column="2" Spacing="8">
                                     <Label Text="DERECHA" TextColor="#5ad6ff"
                                            FontSize="11" FontAttributes="Bold"
                                            HorizontalOptions="Center" />
                                     <VerticalStackLayout x:Name="ZoneR" Spacing="10" />
                                 </VerticalStackLayout>
-
                             </Grid>
                         </Border>
 
@@ -82,33 +77,63 @@
                     </VerticalStackLayout>
                 </ScrollView>
 
-                <!-- Library panel -->
-                <Border x:Name="LibPanel" StrokeShape="RoundRectangle 6"
-                        Stroke="#2c2c38" BackgroundColor="#181820" Padding="12">
-                    <Grid RowDefinitions="Auto,Auto,*" RowSpacing="10">
-                        <ScrollView Grid.Row="0" Orientation="Horizontal"
-                                    HorizontalScrollBarVisibility="Never">
-                            <HorizontalStackLayout Spacing="4">
-                                <Button x:Name="CatAll" Text="Todos" Clicked="OnCat" Style="{StaticResource Cat}" />
-                                <Button x:Name="CatChar" Text="Personajes" Clicked="OnCat" Style="{StaticResource Cat}" />
-                                <Button x:Name="CatVeh" Text="Vehículos" Clicked="OnCat" Style="{StaticResource Cat}" />
-                                <Button x:Name="CatGad" Text="Gadgets" Clicked="OnCat" Style="{StaticResource Cat}" />
-                            </HorizontalStackLayout>
-                        </ScrollView>
-
-                        <SearchBar Grid.Row="1" x:Name="SearchBox"
-                                   Placeholder="Buscar (Batman, TARDIS, ...)"
-                                   TextChanged="OnSearch"
-                                   BackgroundColor="#0e0d12" TextColor="#ececf2" />
-
-                        <ScrollView Grid.Row="2">
-                            <FlexLayout x:Name="LibLayout" Wrap="Wrap"
-                                        JustifyContent="Center" AlignItems="Start" />
-                        </ScrollView>
-                    </Grid>
-                </Border>
-
             </Grid>
         </Grid>
+
+        <!-- Library panel. Reparented by code-behind:
+             landscape -> docked beside the pad (inside BodyGrid)
+             portrait  -> bottom sheet overlay (inside RootGrid) -->
+        <Border x:Name="LibPanel" StrokeShape="RoundRectangle 6"
+                Stroke="#2c2c38" BackgroundColor="#181820" Padding="12">
+            <Grid RowDefinitions="Auto,Auto,Auto,*" RowSpacing="10">
+                <!-- Drag handle / close (visible only in portrait sheet) -->
+                <Grid Row="0" x:Name="SheetHandle" IsVisible="False"
+                      HeightRequest="28">
+                    <BoxView WidthRequest="44" HeightRequest="5" CornerRadius="3"
+                             Color="#3c3c4d" HorizontalOptions="Center"
+                             VerticalOptions="Center" />
+                    <Button Text="✕" Clicked="OnCloseSheet"
+                            BackgroundColor="Transparent" TextColor="#8a8aa0"
+                            FontSize="16" Padding="0" WidthRequest="36" HeightRequest="28"
+                            HorizontalOptions="End" VerticalOptions="Center" />
+                </Grid>
+
+                <ScrollView Grid.Row="1" Orientation="Horizontal"
+                            HorizontalScrollBarVisibility="Never">
+                    <HorizontalStackLayout Spacing="4">
+                        <Button x:Name="CatAll" Text="Todos" Clicked="OnCat" Style="{StaticResource Cat}" />
+                        <Button x:Name="CatChar" Text="Personajes" Clicked="OnCat" Style="{StaticResource Cat}" />
+                        <Button x:Name="CatVeh" Text="Vehículos" Clicked="OnCat" Style="{StaticResource Cat}" />
+                        <Button x:Name="CatGad" Text="Gadgets" Clicked="OnCat" Style="{StaticResource Cat}" />
+                    </HorizontalStackLayout>
+                </ScrollView>
+
+                <SearchBar Grid.Row="2" x:Name="SearchBox"
+                           Placeholder="Buscar (Batman, TARDIS, ...)"
+                           TextChanged="OnSearch"
+                           BackgroundColor="#0e0d12" TextColor="#ececf2" />
+
+                <ScrollView Grid.Row="3">
+                    <FlexLayout x:Name="LibLayout" Wrap="Wrap"
+                                JustifyContent="Center" AlignItems="Start" />
+                </ScrollView>
+            </Grid>
+        </Border>
+
+        <!-- Floating button to open the library (portrait only) -->
+        <Button x:Name="FabFiguras" Text="🧩 Figuras" Clicked="OnOpenSheet"
+                IsVisible="False"
+                BackgroundColor="#f5c518" TextColor="#1a1a1a" FontAttributes="Bold"
+                CornerRadius="24" HeightRequest="48" Padding="20,0"
+                HorizontalOptions="Center" VerticalOptions="End"
+                Margin="0,0,0,18" />
+
+        <!-- Scrim behind the sheet (portrait only) -->
+        <BoxView x:Name="Scrim" Color="#000000" Opacity="0" IsVisible="False"
+                 InputTransparent="False">
+            <BoxView.GestureRecognizers>
+                <TapGestureRecognizer Tapped="OnCloseSheet" />
+            </BoxView.GestureRecognizers>
+        </BoxView>
     </Grid>
 </ContentPage>
