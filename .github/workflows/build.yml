@@ -110,6 +110,7 @@ jobs:
           -c Release -f net10.0-ios
           -p:TargetFrameworks=net10.0-ios
           -p:RuntimeIdentifier=ios-arm64
+          -p:ValidateXcodeVersion=false
           -p:EnableCodeSigning=false
           -p:CodesignKey=
           -p:CodesignProvision=
