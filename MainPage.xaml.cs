@@ -148,6 +148,12 @@ public partial class MainPage : ContentPage
     protected override async void OnAppearing()
     {
         base.OnAppearing();
+
+        // Subscribe to files opened/shared into the app (iOS "Open with").
+        IncomingFile.ZipReceived -= OnIncomingZip;
+        IncomingFile.ZipReceived += OnIncomingZip;
+        await IncomingFile.FlushPendingAsync();
+
         if (_firstRunDone) return;
         _firstRunDone = true;
 
@@ -758,6 +764,26 @@ public partial class MainPage : ContentPage
         SetConnected(ok);
         await Toast(ok ? $"Conectado a {host}" : "No se pudo conectar");
         if (ok) await SyncAsync();
+    }
+
+    // Handles a .zip opened/shared into the app from the OS.
+    async Task OnIncomingZip(byte[] bytes)
+    {
+        await MainThread.InvokeOnMainThreadAsync(async () =>
+        {
+            try
+            {
+                await Toast("Importando...");
+                using var ms = new MemoryStream(bytes);
+                int n = await _lib.ImportZipAsync(ms);
+                RenderLibrary();
+                await DisplayAlert("Importado", $"Importadas {n} figuras.", "OK");
+            }
+            catch (Exception ex)
+            {
+                await DisplayAlert("Error al importar", ex.Message, "OK");
+            }
+        });
     }
 
     async Task ImportFlowAsync()
