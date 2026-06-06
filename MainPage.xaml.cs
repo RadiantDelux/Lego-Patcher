@@ -773,27 +773,27 @@ public partial class MainPage : ContentPage
                     status = await Permissions.RequestAsync<Permissions.StorageRead>();
             }
 
-            // Per-platform file type filter so the picker allows .zip.
-            var zipType = new FilePickerFileType(new Dictionary<DevicePlatform, IEnumerable<string>>
+            // File type filter. On iOS we deliberately DON'T restrict types:
+            // passing specific UTIs greys out zips coming from iCloud/Drive/
+            // other providers. We allow everything and validate it's a real
+            // zip when opening it.
+            PickOptions options;
+            if (DeviceInfo.Platform == DevicePlatform.iOS
+                || DeviceInfo.Platform == DevicePlatform.macOS)
             {
-                // iOS UTType identifiers. Different sources tag zips differently,
-                // so accept the common ones plus generic data/archive to avoid
-                // the file appearing greyed-out in the picker.
-                [DevicePlatform.iOS]      = new[]
+                options = new PickOptions { PickerTitle = "Selecciona tu Dimensions.zip" };
+            }
+            else
+            {
+                var zipType = new FilePickerFileType(new Dictionary<DevicePlatform, IEnumerable<string>>
                 {
-                    "public.zip-archive", "com.pkware.zip-archive",
-                    "public.archive", "public.data", "public.item",
-                },
-                [DevicePlatform.macOS]    = new[] { "public.zip-archive", "zip", "public.data" },
-                [DevicePlatform.Android]  = new[] { "application/zip", "application/octet-stream", "*/*" },
-                [DevicePlatform.WinUI]    = new[] { ".zip" },
-            });
+                    [DevicePlatform.Android] = new[] { "application/zip", "application/octet-stream", "*/*" },
+                    [DevicePlatform.WinUI]   = new[] { ".zip" },
+                });
+                options = new PickOptions { PickerTitle = "Selecciona tu Dimensions.zip", FileTypes = zipType };
+            }
 
-            var result = await FilePicker.Default.PickAsync(new PickOptions
-            {
-                PickerTitle = "Selecciona tu Dimensions.zip",
-                FileTypes = zipType,
-            });
+            var result = await FilePicker.Default.PickAsync(options);
             if (result is null) return;
 
             await Toast("Importando...");
