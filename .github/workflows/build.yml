@@ -80,8 +80,14 @@ jobs:
           if-no-files-found: warn
 
   # ------------------------------------------------------------ iOS / macOS
+  # NOTE: .NET 10 MAUI iOS/macOS workloads currently require a newer Xcode
+  # than the GitHub macOS runners provide (workload wants 26.5, runner has
+  # 26.3). Until the runners update, this job is allowed to fail without
+  # blocking the Android/Windows artifacts. It will start passing on its own
+  # once the runner ships the required Xcode.
   apple:
     runs-on: macos-15
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - name: Select Xcode
