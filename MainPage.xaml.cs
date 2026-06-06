@@ -164,12 +164,21 @@ public partial class MainPage : ContentPage
 
         if (!_lib.HasFigures)
         {
+            string extra = "";
+            if (DeviceInfo.Platform == DevicePlatform.iOS)
+                extra = "\n\nNOTA iOS: si el selector de archivos no te deja " +
+                        "elegir el zip (bug de iOS), descomprímelo y copia las " +
+                        "carpetas Characters, Vehicles y Gadgets dentro de " +
+                        "Archivos → En mi iPhone → LEGOPATCHER → Dimensions. " +
+                        "También puedes abrir el zip desde Archivos y elegir " +
+                        "Compartir → LEGOPATCHER.";
+
             bool pick = await DisplayAlert("Importar figuras (.zip)",
                 "Para colocar figuras necesitas un archivo .zip con los volcados NFC (.bin) " +
                 "organizados en carpetas Characters, Vehicles y Gadgets.\n\n" +
                 "Por motivos legales estos archivos NO se incluyen en la app: son contenido " +
                 "del juego y cada quien debe aportar los suyos. Se guardan solo en este " +
-                "dispositivo, nunca se suben a ningún servidor.\n\n" +
+                "dispositivo, nunca se suben a ningún servidor." + extra + "\n\n" +
                 "¿Quieres seleccionar tu Dimensions.zip ahora?",
                 "Seleccionar zip", "Más tarde");
             if (pick) await ImportFlowAsync();
@@ -831,7 +840,23 @@ public partial class MainPage : ContentPage
             {
                 result = await FilePicker.Default.PickAsync(options);
             });
-            if (result is null) return;
+            if (result is null)
+            {
+                // iOS 26 picker bug: Select may not work. Tell the user the
+                // manual route via the Files app.
+                if (DeviceInfo.Platform == DevicePlatform.iOS)
+                {
+                    await DisplayAlert("¿No puedes seleccionar el zip?",
+                        "Es un bug de iOS con el selector de archivos. Alternativas:\n\n" +
+                        "1) Abre el zip desde la app Archivos y elige " +
+                        "Compartir → LEGOPATCHER.\n\n" +
+                        "2) Descomprime el zip y copia las carpetas Characters, " +
+                        "Vehicles y Gadgets dentro de Archivos → En mi iPhone → " +
+                        "LEGOPATCHER → Dimensions.",
+                        "Entendido");
+                }
+                return;
+            }
 
             await Toast("Importando...");
 
