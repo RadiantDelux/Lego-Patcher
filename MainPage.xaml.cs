@@ -420,21 +420,40 @@ public partial class MainPage : ContentPage
             await Toast("Primero toca un espacio del Toy Pad");
             return;
         }
-        if (!await EnsureConnectedAsync()) return;
 
         var slot = _selectedSlot;
+
+        // Optimistic UI: update the slot and close the sheet immediately,
+        // then upload in the background. This makes the sheet drop instantly
+        // instead of waiting ~1-2s for the FTP transfer.
+        var prev = (_slots[slot].Name, _slots[slot].RelPath, _slots[slot].Thumb,
+                    _slots[slot].Filled);
+        _slots[slot].Set(f.Name, f.RelPath, f.ThumbFile);
+        _selectedSlot = null;
+        RefreshAllSlotVisuals();
+        if (!_isWide && _sheetOpen) OnCloseSheet(this, EventArgs.Empty);
+
+        if (!await EnsureConnectedAsync())
+        {
+            // revert
+            if (prev.Filled) _slots[slot].Set(prev.Name, prev.RelPath, prev.Thumb);
+            else _slots[slot].Clear();
+            RefreshAllSlotVisuals();
+            return;
+        }
+
         try
         {
             var bytes = _lib.ReadBytes(f);
             await _ps3.PlaceAsync(slot, bytes);
-            _slots[slot].Set(f.Name, f.RelPath, f.ThumbFile);
-            _selectedSlot = null;
-            RefreshAllSlotVisuals();
             await Toast($"{f.Name} → {slot}");
-            if (!_isWide && _sheetOpen) OnCloseSheet(this, EventArgs.Empty);
         }
         catch (Exception ex)
         {
+            if (prev.Filled) _slots[slot].Set(prev.Name, prev.RelPath, prev.Thumb);
+            else _slots[slot].Clear();
+            RefreshAllSlotVisuals();
+
             var detail = ex.Message;
             var inner = ex.InnerException;
             int depth = 0;
