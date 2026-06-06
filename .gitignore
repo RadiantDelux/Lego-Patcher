@@ -1,0 +1,18 @@
+# .NET / MAUI build output
+bin/
+obj/
+*.user
+*.suo
+.vs/
+.idea/
+
+# Build artifacts
+*.apk
+*.aab
+*.ipa
+*.app/
+*.dll.config
+
+# OS
+.DS_Store
+Thumbs.db

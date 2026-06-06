@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml">
+
+    <Style x:Key="Ghost" TargetType="Button">
+        <Setter Property="BackgroundColor" Value="#181820" />
+        <Setter Property="TextColor" Value="#ececf2" />
+        <Setter Property="BorderColor" Value="#3c3c4d" />
+        <Setter Property="BorderWidth" Value="1" />
+        <Setter Property="CornerRadius" Value="6" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="Padding" Value="12,7" />
+        <Setter Property="HeightRequest" Value="38" />
+    </Style>
+
+    <Style x:Key="Primary" TargetType="Button">
+        <Setter Property="BackgroundColor" Value="#f5c518" />
+        <Setter Property="TextColor" Value="#1a1a1a" />
+        <Setter Property="BorderWidth" Value="0" />
+        <Setter Property="CornerRadius" Value="6" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="FontAttributes" Value="Bold" />
+        <Setter Property="Padding" Value="12,7" />
+        <Setter Property="HeightRequest" Value="38" />
+    </Style>
+
+    <Style x:Key="Danger" TargetType="Button">
+        <Setter Property="BackgroundColor" Value="Transparent" />
+        <Setter Property="TextColor" Value="#ff8a8a" />
+        <Setter Property="BorderColor" Value="#7fef4444" />
+        <Setter Property="BorderWidth" Value="1" />
+        <Setter Property="CornerRadius" Value="6" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="Padding" Value="12,7" />
+        <Setter Property="HeightRequest" Value="38" />
+    </Style>
+
+    <Style x:Key="Cat" TargetType="Button">
+        <Setter Property="BackgroundColor" Value="Transparent" />
+        <Setter Property="TextColor" Value="#8a8aa0" />
+        <Setter Property="BorderColor" Value="#3c3c4d" />
+        <Setter Property="BorderWidth" Value="1" />
+        <Setter Property="CornerRadius" Value="6" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="Padding" Value="10,5" />
+        <Setter Property="HeightRequest" Value="34" />
+    </Style>
+
+</ResourceDictionary>

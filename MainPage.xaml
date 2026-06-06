@@ -1,0 +1,108 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:ToyPadMaui.ViewModels"
+             x:Class="ToyPadMaui.MainPage"
+             Shell.NavBarIsVisible="False"
+             BackgroundColor="#0e0d12">
+
+    <Grid>
+        <!-- Wallpaper background -->
+        <Image x:Name="BgImage" Aspect="AspectFill" Opacity="1" />
+        <BoxView Color="#0e0d12" Opacity="0.45" />
+
+        <Grid RowDefinitions="Auto,*" Padding="0">
+
+            <!-- Topbar -->
+            <Grid Row="0" Padding="14,12" ColumnDefinitions="*,Auto,*"
+                  BackgroundColor="#d90e0d18">
+                <Image Grid.Column="1" x:Name="LogoImage" HeightRequest="64"
+                       Aspect="AspectFit" HorizontalOptions="Center" />
+                <HorizontalStackLayout Grid.Column="2" Spacing="6"
+                                       HorizontalOptions="End" VerticalOptions="Center">
+                    <Ellipse x:Name="ConnDot" WidthRequest="10" HeightRequest="10"
+                             Fill="#555" VerticalOptions="Center" />
+                    <Label x:Name="ConnText" Text="sin conexión" TextColor="#8a8aa0"
+                           FontSize="12" VerticalOptions="Center" Margin="0,0,6,0" />
+                    <Button Text="¿Qué es?" Clicked="OnAbout" Style="{StaticResource Ghost}" />
+                    <Button Text="Importar" Clicked="OnImport" Style="{StaticResource Ghost}" />
+                    <Button Text="Instalar PS3" Clicked="OnInstall" Style="{StaticResource Primary}" />
+                    <Button Text="Conectar" Clicked="OnConnect" Style="{StaticResource Ghost}" />
+                    <Button Text="Créditos" Clicked="OnCredits" Style="{StaticResource Ghost}" />
+                </HorizontalStackLayout>
+            </Grid>
+
+            <!-- Body: pad + library -->
+            <Grid Row="1" ColumnDefinitions="*,*" Padding="16" ColumnSpacing="16">
+
+                <!-- Toy pad -->
+                <ScrollView Grid.Column="0">
+                    <VerticalStackLayout Spacing="12">
+                        <Border StrokeShape="RoundRectangle 6"
+                                Stroke="#2c2c38" BackgroundColor="#181820" Padding="20">
+                            <Grid ColumnDefinitions="*,*,*" ColumnSpacing="14">
+
+                                <VerticalStackLayout Grid.Column="0" Spacing="8">
+                                    <Label Text="IZQUIERDA" TextColor="#8a8aa0"
+                                           FontSize="11" FontAttributes="Bold"
+                                           HorizontalOptions="Center" />
+                                    <VerticalStackLayout x:Name="ZoneL" Spacing="10" />
+                                </VerticalStackLayout>
+
+                                <VerticalStackLayout Grid.Column="1" Spacing="8"
+                                                     VerticalOptions="Center">
+                                    <Label Text="CENTRO" TextColor="#f5c518"
+                                           FontSize="11" FontAttributes="Bold"
+                                           HorizontalOptions="Center" />
+                                    <VerticalStackLayout x:Name="ZoneC" Spacing="10" />
+                                </VerticalStackLayout>
+
+                                <VerticalStackLayout Grid.Column="2" Spacing="8">
+                                    <Label Text="DERECHA" TextColor="#5ad6ff"
+                                           FontSize="11" FontAttributes="Bold"
+                                           HorizontalOptions="Center" />
+                                    <VerticalStackLayout x:Name="ZoneR" Spacing="10" />
+                                </VerticalStackLayout>
+
+                            </Grid>
+                        </Border>
+
+                        <HorizontalStackLayout Spacing="8" HorizontalOptions="End">
+                            <Button Text="↻ Sincronizar" Clicked="OnSync" Style="{StaticResource Ghost}" />
+                            <Button Text="Limpiar todo" Clicked="OnClear" Style="{StaticResource Danger}" />
+                        </HorizontalStackLayout>
+
+                        <Label x:Name="HintLabel"
+                               Text="Arrastra una figura a un espacio, o toca un espacio y luego una figura. Arrastra entre espacios para mover o intercambiar. Toca un espacio lleno para quitar."
+                               TextColor="#8a8aa0" FontSize="12"
+                               HorizontalTextAlignment="Center" />
+                    </VerticalStackLayout>
+                </ScrollView>
+
+                <!-- Library -->
+                <Border Grid.Column="1" StrokeShape="RoundRectangle 6"
+                        Stroke="#2c2c38" BackgroundColor="#181820" Padding="16">
+                    <Grid RowDefinitions="Auto,Auto,*" RowSpacing="10">
+                        <HorizontalStackLayout Grid.Row="0" Spacing="4">
+                            <Button x:Name="CatAll" Text="Todos" Clicked="OnCat" Style="{StaticResource Cat}" />
+                            <Button x:Name="CatChar" Text="Personajes" Clicked="OnCat" Style="{StaticResource Cat}" />
+                            <Button x:Name="CatVeh" Text="Vehículos" Clicked="OnCat" Style="{StaticResource Cat}" />
+                            <Button x:Name="CatGad" Text="Gadgets" Clicked="OnCat" Style="{StaticResource Cat}" />
+                        </HorizontalStackLayout>
+
+                        <SearchBar Grid.Row="1" x:Name="SearchBox"
+                                   Placeholder="Buscar (Batman, TARDIS, ...)"
+                                   TextChanged="OnSearch"
+                                   BackgroundColor="#0e0d12" TextColor="#ececf2" />
+
+                        <ScrollView Grid.Row="2">
+                            <FlexLayout x:Name="LibLayout" Wrap="Wrap"
+                                        JustifyContent="Start" AlignItems="Start" />
+                        </ScrollView>
+                    </Grid>
+                </Border>
+
+            </Grid>
+        </Grid>
+    </Grid>
+</ContentPage>

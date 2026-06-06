@@ -1,0 +1,111 @@
+name: Build LEGOPATCHER (MAUI)
+
+# Builds the app for every platform and uploads the artifacts.
+#   - Android (.apk)   on ubuntu  (unsigned debug-keystore APK, installable)
+#   - Windows          on windows
+#   - iOS (.ipa)       on macOS   (UNSIGNED - needs your Apple cert to install)
+#   - macOS (.app)     on macOS
+#
+# IMPORTANT: this file must live at  .github/workflows/build.yml  in the ROOT
+# of the GitHub repository. If the repo root IS the ToyPadMaui folder, set
+# PROJECT to 'ToyPadMaui.csproj'. If the repo contains ToyPadMaui/ as a
+# subfolder, keep 'ToyPadMaui/ToyPadMaui.csproj'.
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+env:
+  DOTNET_VERSION: '10.0.x'
+  PROJECT: ToyPadMaui.csproj
+
+jobs:
+  # ---------------------------------------------------------------- Android
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+      - name: Install MAUI Android workload
+        run: dotnet workload install maui-android
+      - name: Build APK (Release)
+        run: >
+          dotnet publish ${{ env.PROJECT }}
+          -c Release -f net10.0-android
+          -p:AndroidPackageFormat=apk
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: legopatcher-android
+          path: |
+            **/*-Signed.apk
+            **/publish/*.apk
+            **/bin/Release/net10.0-android/**/*.apk
+          if-no-files-found: warn
+
+  # ---------------------------------------------------------------- Windows
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+      - name: Install MAUI Windows workload
+        run: dotnet workload install maui-windows
+      - name: Build (Release)
+        run: >
+          dotnet build ${{ env.PROJECT }}
+          -c Release -f net10.0-windows10.0.19041.0
+      - name: Upload Windows build
+        uses: actions/upload-artifact@v4
+        with:
+          name: legopatcher-windows
+          path: 'bin/Release/net10.0-windows10.0.19041.0/**'
+          if-no-files-found: warn
+
+  # ------------------------------------------------------------ iOS / macOS
+  apple:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+      - name: Install MAUI Apple workloads
+        run: dotnet workload install maui-ios maui-maccatalyst
+
+      # iOS — unsigned .ipa. Install requires your own signing later
+      # (AltStore / free Apple dev cert / paid account).
+      - name: Build iOS (Release, unsigned)
+        run: >
+          dotnet publish ${{ env.PROJECT }}
+          -c Release -f net10.0-ios
+          -p:RuntimeIdentifier=ios-arm64
+          -p:EnableCodeSigning=false
+          -p:CodesignKey=
+          -p:CodesignProvision=
+          -p:BuildIpa=true
+      - name: Upload iOS .ipa (unsigned)
+        uses: actions/upload-artifact@v4
+        with:
+          name: legopatcher-ios-unsigned
+          path: '**/*.ipa'
+          if-no-files-found: warn
+
+      # macOS (Mac Catalyst) — .app bundle, unsigned.
+      - name: Build MacCatalyst (Release)
+        run: >
+          dotnet publish ${{ env.PROJECT }}
+          -c Release -f net10.0-maccatalyst
+          -p:CreatePackage=false
+          -p:EnableCodeSigning=false
+      - name: Upload macOS .app
+        uses: actions/upload-artifact@v4
+        with:
+          name: legopatcher-macos
+          path: '**/bin/Release/net10.0-maccatalyst/**/*.app'
+          if-no-files-found: warn
