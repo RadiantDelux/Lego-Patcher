@@ -113,10 +113,39 @@
                            TextChanged="OnSearch"
                            BackgroundColor="#0e0d12" TextColor="#ececf2" />
 
-                <ScrollView Grid.Row="3">
-                    <FlexLayout x:Name="LibLayout" Wrap="Wrap"
-                                JustifyContent="Center" AlignItems="Start" />
-                </ScrollView>
+                <CollectionView Grid.Row="3" x:Name="LibCollection"
+                                SelectionMode="None">
+                    <CollectionView.ItemsLayout>
+                        <GridItemsLayout Orientation="Vertical" Span="3"
+                                         HorizontalItemSpacing="6" VerticalItemSpacing="6" />
+                    </CollectionView.ItemsLayout>
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate x:DataType="vm:FigureVm">
+                            <Border StrokeThickness="1" Padding="0" Margin="0"
+                                    HeightRequest="128"
+                                    BackgroundColor="#1f1f2a">
+                                <Border.Stroke>#2c2c38</Border.Stroke>
+                                <Border.StrokeShape>
+                                    <RoundRectangle CornerRadius="6" />
+                                </Border.StrokeShape>
+                                <Border.GestureRecognizers>
+                                    <TapGestureRecognizer Tapped="OnFigureCardTapped" />
+                                    <DragGestureRecognizer DragStarting="OnFigureDragStarting" />
+                                </Border.GestureRecognizers>
+                                <VerticalStackLayout Spacing="4" Padding="6"
+                                                     InputTransparent="True" CascadeInputTransparent="True">
+                                    <Image Source="{Binding Thumb}" Aspect="AspectFit"
+                                           HeightRequest="80" InputTransparent="True" />
+                                    <Label Text="{Binding Name}" FontSize="11"
+                                           TextColor="#ececf2"
+                                           HorizontalTextAlignment="Center"
+                                           LineBreakMode="WordWrap" MaxLines="2"
+                                           InputTransparent="True" />
+                                </VerticalStackLayout>
+                            </Border>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
             </Grid>
         </Border>
 

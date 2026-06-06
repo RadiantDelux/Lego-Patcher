@@ -227,13 +227,13 @@ public partial class MainPage : ContentPage
         // Remove (X) button, top-right, visible only when slot is filled.
         var removeBtn = new Button
         {
-            Text = "✕", FontSize = 12, FontAttributes = FontAttributes.Bold,
+            Text = "✕", FontSize = 9, FontAttributes = FontAttributes.Bold,
             TextColor = Color.FromArgb("#ff8a8a"),
-            BackgroundColor = Color.FromArgb("#aa1a1020"),
-            CornerRadius = 11, Padding = 0,
-            WidthRequest = 22, HeightRequest = 22,
+            BackgroundColor = Color.FromArgb("#cc1a1020"),
+            CornerRadius = 9, Padding = 0,
+            WidthRequest = 18, HeightRequest = 18,
             HorizontalOptions = LayoutOptions.End, VerticalOptions = LayoutOptions.Start,
-            Margin = new Thickness(0, 4, 4, 0),
+            Margin = new Thickness(0, 3, 3, 0),
         };
         removeBtn.SetBinding(IsVisibleProperty, new Binding(nameof(SlotVm.Filled)));
         removeBtn.Clicked += async (_, _) => await RemoveSlotAsync(id);
@@ -312,20 +312,71 @@ public partial class MainPage : ContentPage
 
     async void OnSlotTapped(string id)
     {
-        var vm = _slots[id];
-        // Selecting any slot (filled or empty) targets it for the next figure.
-        // Removing is done with the slot's ✕ button.
+        // Tap-to-move: if a FILLED slot is already selected and we tap a
+        // DIFFERENT slot, move/swap between them (works on touch where drag
+        // is unreliable).
+        if (_selectedSlot is not null && _selectedSlot != id
+            && _slots[_selectedSlot].Filled)
+        {
+            await MoveOrSwapAsync(_selectedSlot, id);
+            _selectedSlot = null;
+            RefreshAllSlotVisuals();
+            if (!_isWide && _sheetOpen) OnCloseSheet(this, EventArgs.Empty);
+            return;
+        }
+
+        // Otherwise toggle selection of this slot.
         _selectedSlot = (_selectedSlot == id) ? null : id;
         RefreshAllSlotVisuals();
 
-        // In portrait, open the figure sheet when a slot gets selected,
-        // close it when deselected.
+        // Portrait: open the figure sheet only when selecting an EMPTY slot
+        // (to pick a figure). Selecting a filled slot just arms it for a move.
         if (!_isWide)
         {
-            if (_selectedSlot is not null && !_sheetOpen) OnOpenSheet(this, EventArgs.Empty);
+            bool emptySelected = _selectedSlot is not null && !_slots[_selectedSlot].Filled;
+            if (emptySelected && !_sheetOpen) OnOpenSheet(this, EventArgs.Empty);
             else if (_selectedSlot is null && _sheetOpen) OnCloseSheet(this, EventArgs.Empty);
         }
-        await Task.CompletedTask;
+    }
+
+    // Move (dst empty) or swap (dst filled) the figures between two slots.
+    async Task MoveOrSwapAsync(string srcSlot, string dstSlot)
+    {
+        if (!await EnsureConnectedAsync()) return;
+        var src = _slots[srcSlot];
+        var dst = _slots[dstSlot];
+        if (!src.Filled) return;
+
+        try
+        {
+            if (dst.Filled)
+            {
+                var srcFig = _lib.Figures.FirstOrDefault(x => x.RelPath == src.RelPath);
+                var dstFig = _lib.Figures.FirstOrDefault(x => x.RelPath == dst.RelPath);
+                if (srcFig is null || dstFig is null)
+                {
+                    await Toast("No puedo intercambiar (figura no encontrada)");
+                    return;
+                }
+                await _ps3.PlaceAsync(dstSlot, _lib.ReadBytes(srcFig));
+                await _ps3.PlaceAsync(srcSlot, _lib.ReadBytes(dstFig));
+                var sN = src.Name; var sP = src.RelPath; var sT = src.Thumb;
+                src.Set(dst.Name, dst.RelPath, dst.Thumb);
+                dst.Set(sN, sP, sT);
+                await Toast($"Intercambio {srcSlot} ↔ {dstSlot}");
+            }
+            else
+            {
+                var srcFig = _lib.Figures.FirstOrDefault(x => x.RelPath == src.RelPath);
+                if (srcFig is null) { await Toast("Figura no encontrada"); return; }
+                await _ps3.PlaceAsync(dstSlot, _lib.ReadBytes(srcFig));
+                await _ps3.RemoveAsync(srcSlot);
+                dst.Set(src.Name, src.RelPath, src.Thumb);
+                src.Clear();
+                await Toast($"Movido {srcSlot} → {dstSlot}");
+            }
+        }
+        catch (Exception ex) { await Toast($"Error: {ex.Message}"); }
     }
 
     async Task RemoveSlotAsync(string id)
@@ -457,16 +508,13 @@ public partial class MainPage : ContentPage
 
     void RenderLibrary()
     {
-        LibLayout.Children.Clear();
         var q = _curQuery.Trim().ToLowerInvariant();
-
-        foreach (var f in _lib.Figures)
-        {
-            if (_curCat != "all" && f.Category.ToString().ToLowerInvariant() + "s" != _curCat
-                && !MatchCat(f.Category, _curCat)) continue;
-            if (q.Length > 0 && !f.Name.ToLowerInvariant().Contains(q)) continue;
-            LibLayout.Children.Add(BuildFigureCard(f));
-        }
+        var items = _lib.Figures
+            .Where(f => _curCat == "all" || MatchCat(f.Category, _curCat))
+            .Where(f => q.Length == 0 || f.Name.ToLowerInvariant().Contains(q))
+            .Select(FigureVm.From)
+            .ToList();
+        LibCollection.ItemsSource = items;
     }
 
     static bool MatchCat(FigureCategory cat, string key) => key switch
@@ -477,52 +525,22 @@ public partial class MainPage : ContentPage
         _ => true,
     };
 
-    View BuildFigureCard(Figure f)
+    void OnFigureCardTapped(object? sender, EventArgs e)
     {
-        var img = new Image
+        if (sender is Element el && el.BindingContext is FigureVm vm)
         {
-            Aspect = Aspect.AspectFit, HeightRequest = 84,
-            Source = f.ThumbFile, InputTransparent = true,
-        };
-        var name = new Label
-        {
-            Text = f.Name, FontSize = 11, TextColor = Color.FromArgb("#ececf2"),
-            HorizontalTextAlignment = TextAlignment.Center,
-            LineBreakMode = LineBreakMode.WordWrap, MaxLines = 2,
-            InputTransparent = true,
-        };
+            var f = _lib.Figures.FirstOrDefault(x => x.RelPath == vm.RelPath);
+            if (f is not null) OnFigureTapped(f);
+        }
+    }
 
-        var content = new VerticalStackLayout
-        {
-            Spacing = 4, Padding = 8, InputTransparent = true,
-            CascadeInputTransparent = true,
-            Children = { img, name },
-        };
-
-        var border = new Border
-        {
-            WidthRequest = 120, HeightRequest = 130, Margin = 4,
-            StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = 6 },
-            Stroke = Color.FromArgb("#2c2c38"), StrokeThickness = 1,
-            BackgroundColor = Color.FromArgb("#1f1f2a"),
-            Content = content,
-        };
-
-        // Tap to place into selected slot.
-        var tap = new TapGestureRecognizer();
-        tap.Tapped += (_, _) => OnFigureTapped(f);
-        border.GestureRecognizers.Add(tap);
-
-        // Drag a library figure -> drop on a slot to place it.
-        var drag = new DragGestureRecognizer();
-        drag.DragStarting += (_, e) =>
+    void OnFigureDragStarting(object? sender, DragStartingEventArgs e)
+    {
+        if (sender is Element el && el.BindingContext is FigureVm vm)
         {
             e.Data.Properties["kind"] = "lib";
-            e.Data.Properties["relpath"] = f.RelPath;
-        };
-        border.GestureRecognizers.Add(drag);
-
-        return border;
+            e.Data.Properties["relpath"] = vm.RelPath;
+        }
     }
 
     // ---- toolbar handlers ---------------------------------------------------
