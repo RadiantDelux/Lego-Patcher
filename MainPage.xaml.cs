@@ -691,6 +691,16 @@ public partial class MainPage : ContentPage
     {
         try
         {
+            // Android < 13 needs storage read permission to open files from
+            // shared folders like Download/.
+            if (DeviceInfo.Platform == DevicePlatform.Android)
+            {
+                var status = await Permissions.CheckStatusAsync<Permissions.StorageRead>();
+                if (status != PermissionStatus.Granted)
+                    status = await Permissions.RequestAsync<Permissions.StorageRead>();
+                // If denied we still try; SAF stream may work regardless.
+            }
+
             var result = await FilePicker.Default.PickAsync(new PickOptions
             {
                 PickerTitle = "Selecciona tu Dimensions.zip",
@@ -698,11 +708,13 @@ public partial class MainPage : ContentPage
             if (result is null) return;
 
             await Toast("Importando...");
-            using var stream = await result.OpenReadAsync();
-            // copy to memory so ZipArchive can seek
+
+            // Read via the SAF stream (avoids needing the raw file path).
             using var ms = new MemoryStream();
-            await stream.CopyToAsync(ms);
+            using (var stream = await result.OpenReadAsync())
+                await stream.CopyToAsync(ms);
             ms.Position = 0;
+
             int n = await _lib.ImportZipAsync(ms);
             RenderLibrary();
             await Toast($"Importadas {n} figuras");
