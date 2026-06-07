@@ -574,6 +574,9 @@ public partial class MainPage : ContentPage
 
     void OnFigureCardTapped(object? sender, EventArgs e)
     {
+        // Dismiss keyboard (stays open from search bar on mobile).
+        SearchBox.Unfocus();
+
         if (sender is Element el && el.BindingContext is FigureVm vm)
         {
             var f = _lib.Figures.FirstOrDefault(x => x.RelPath == vm.RelPath);
