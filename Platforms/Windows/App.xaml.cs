@@ -17,6 +17,22 @@ public partial class App : MauiWinUIApplication
 	public App()
 	{
 		this.InitializeComponent();
+
+		// WinUI captura aquí las "stowed exceptions" (0xC000027B) que el
+		// AppDomain de .NET no ve. Volcamos a un archivo en el escritorio.
+		this.UnhandledException += (s, e) =>
+		{
+			try
+			{
+				var path = System.IO.Path.Combine(
+					Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory),
+					"legopatcher_crash.txt");
+				System.IO.File.AppendAllText(path,
+					$"=== {DateTime.Now:O} [WinUI.UnhandledException] ===\n" +
+					$"Message: {e.Message}\n{e.Exception}\n\n");
+			}
+			catch { }
+		};
 	}
 
 	protected override MauiApp CreateMauiApp() => MauiProgram.CreateMauiApp();

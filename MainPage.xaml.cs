@@ -182,10 +182,22 @@ public partial class MainPage : ContentPage
         if (_firstRunDone) return;
         _firstRunDone = true;
 
-        // iOS will not show alerts launched from the constructor/InitAsync
-        // (page not yet on screen). Run the first-run prompts here, and give
-        // the UI one frame to settle.
-        await Task.Delay(300);
+        // Los DisplayAlert no pueden dispararse hasta que la página esté
+        // realmente montada en el árbol visual. En Windows, llamarlos desde
+        // OnAppearing (incluso con Task.Delay) provoca "This element does not
+        // have a XamlRoot" -> fail-fast (0xC000027B). Encolamos el flujo en el
+        // Dispatcher para que corra tras el primer render, y lo protegemos.
+        Dispatcher.Dispatch(async () =>
+        {
+            try { await FirstRunAsync(); }
+            catch { /* nunca tumbar la app por los prompts de bienvenida */ }
+        });
+    }
+
+    async Task FirstRunAsync()
+    {
+        // Pequeña espera para asegurar que la ventana ya tiene XamlRoot.
+        await Task.Delay(400);
 
         if (!_lib.HasFigures)
         {
