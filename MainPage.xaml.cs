@@ -28,7 +28,32 @@ public partial class MainPage : ContentPage
         _lib = lib;
         BuildSlots();
         SizeChanged += OnPageSizeChanged;
+        RefreshPlatformUi();
         _ = InitAsync();
+    }
+
+    // Reflect the current platform on the toolbar button + install button.
+    void RefreshPlatformUi()
+    {
+        if (PlatformButton is not null)
+            PlatformButton.Text = AppSettings.IsPs4 ? "Modo: PS4" : "Modo: PS3";
+        if (InstallButton is not null)
+            InstallButton.Text = AppSettings.IsPs4 ? "Instalar PS4" : "Instalar PS3";
+    }
+
+    async void OnTogglePlatform(object? sender, EventArgs e)
+    {
+        // simple toggle PS3 <-> PS4; lets the user switch without re-running
+        // the connect flow.
+        string choice = await DisplayActionSheet("Plataforma destino", "Cancelar", null,
+            "PS3 (webMAN / multiMAN)", "PS4 (GoldHEN)");
+        if (choice is null || choice == "Cancelar") return;
+        bool ps4 = choice.StartsWith("PS4");
+        AppSettings.Platform = ps4 ? "ps4" : "ps3";
+        AppSettings.FtpPort = 0; // use platform default (PS3=21, PS4=2121)
+        RefreshPlatformUi();
+        SetConnected(false);
+        await Toast(ps4 ? "Modo PS4 (FTP 2121)" : "Modo PS3 (FTP 21)");
     }
 
     bool _isWide = true;
