@@ -666,6 +666,13 @@ public partial class MainPage : ContentPage
     async void OnInstall(object? sender, EventArgs e)
     {
         if (!await EnsureConnectedAsync()) return;
+
+        if (AppSettings.IsPs4)
+        {
+            await InstallPs4FlowAsync();
+            return;
+        }
+
         bool go = await DisplayAlert("Instalar en la PS3",
             "Se subirá el plugin (toypad_emu.sprx) y se reemplazará el EBOOT.BIN del juego " +
             "por el parcheado (se hace un respaldo del original). ¿Continuar?",
@@ -684,6 +691,33 @@ public partial class MainPage : ContentPage
 
             await DisplayAlert("Listo",
                 "Instalación completada. Reinicia el juego desde el XMB para cargar el plugin.", "OK");
+            HintLabel.Text = DefaultHint;
+        }
+        catch (Exception ex)
+        {
+            HintLabel.Text = DefaultHint;
+            await DisplayAlert("Error", ex.Message, "OK");
+        }
+    }
+
+    async Task InstallPs4FlowAsync()
+    {
+        bool go = await DisplayAlert("Instalar en la PS4 (GoldHEN)",
+            "Se subirá el plugin (toypad_emu.prx) a /data/GoldHEN/plugins/, se " +
+            "registrará en plugins.ini para CUSA00935, y se creará /data/toypad_emu/. " +
+            "Requiere GoldHEN con Plugin Loader y su FTP (2121) encendidos. ¿Continuar?",
+            "Instalar", "Cancelar");
+        if (!go) return;
+
+        try
+        {
+            HintLabel.Text = "Subiendo plugin .prx a GoldHEN...";
+            var prx = await FigureLibrary.ReadAssetAsync("toypad_emu.prx");
+            await _ps3.InstallPs4Async(prx);
+
+            await DisplayAlert("Listo",
+                "Plugin instalado y registrado. Reinicia el juego para que GoldHEN " +
+                "lo cargue. Las figuras van a /data/toypad_emu/.", "OK");
             HintLabel.Text = DefaultHint;
         }
         catch (Exception ex)
@@ -751,19 +785,31 @@ public partial class MainPage : ContentPage
 
     async Task ConnectFlowAsync()
     {
-        string host = await DisplayPromptAsync("Conectar a la PS3",
-            "IP local de la PS3 (la ves en webMAN o ajustes de red):",
+        // 0. choose target platform
+        string plat = await DisplayActionSheet("¿Qué consola?", "Cancelar", null,
+            "PS3 (webMAN / multiMAN)", "PS4 (GoldHEN)");
+        if (plat is null || plat == "Cancelar") return;
+        bool ps4 = plat.StartsWith("PS4");
+        AppSettings.Platform = ps4 ? "ps4" : "ps3";
+        AppSettings.FtpPort = 0; // use platform default (PS3=21, PS4=2121)
+
+        string label = ps4 ? "Conectar a la PS4" : "Conectar a la PS3";
+        string ipHint = ps4
+            ? "IP local de la PS4 (Ajustes > Red). FTP de GoldHEN en :2121:"
+            : "IP local de la PS3 (la ves en webMAN o ajustes de red):";
+
+        string host = await DisplayPromptAsync(label, ipHint,
             initialValue: AppSettings.Host, placeholder: "192.168.1.10",
             keyboard: Keyboard.Url);
         if (host is null) return;
         host = host.Trim();
         if (host.Length == 0) return;
 
-        string user = await DisplayPromptAsync("Conectar a la PS3",
+        string user = await DisplayPromptAsync(label,
             "Usuario FTP:", initialValue: string.IsNullOrEmpty(AppSettings.User) ? "anonymous" : AppSettings.User);
         if (user is null) user = "anonymous";
 
-        string pass = await DisplayPromptAsync("Conectar a la PS3",
+        string pass = await DisplayPromptAsync(label,
             "Contraseña FTP (vacío suele bastar):", initialValue: AppSettings.Pass);
         pass ??= "";
 
@@ -774,7 +820,7 @@ public partial class MainPage : ContentPage
         await Toast("Probando conexión...");
         bool ok = await _ps3.TestAsync();
         SetConnected(ok);
-        await Toast(ok ? $"Conectado a {host}" : "No se pudo conectar");
+        await Toast(ok ? $"Conectado a {host} ({(ps4 ? "PS4" : "PS3")})" : "No se pudo conectar");
         if (ok) await SyncAsync();
     }
 
@@ -901,6 +947,8 @@ public partial class MainPage : ContentPage
         ConnDot.Fill = ok ? Color.FromArgb("#4ade80") : Color.FromArgb("#ef4444");
         ConnText.Text = ok ? AppSettings.Host
             : (string.IsNullOrWhiteSpace(AppSettings.Host) ? "sin conexión" : "desconectado");
+        if (InstallButton is not null)
+            InstallButton.Text = AppSettings.IsPs4 ? "Instalar PS4" : "Instalar PS3";
     }
 
     Task Toast(string msg) => DisplayAlertShort(msg);

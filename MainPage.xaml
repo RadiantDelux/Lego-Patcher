@@ -28,7 +28,7 @@
                                FontSize="12" VerticalOptions="Center" Margin="0,0,6,0" />
                         <Button Text="¿Qué es?" Clicked="OnAbout" Style="{StaticResource Ghost}" />
                         <Button Text="Importar" Clicked="OnImport" Style="{StaticResource Ghost}" />
-                        <Button Text="Instalar PS3" Clicked="OnInstall" Style="{StaticResource Primary}" />
+                        <Button x:Name="InstallButton" Text="Instalar" Clicked="OnInstall" Style="{StaticResource Primary}" />
                         <Button Text="Conectar" Clicked="OnConnect" Style="{StaticResource Ghost}" />
                         <Button Text="Créditos" Clicked="OnCredits" Style="{StaticResource Ghost}" />
                     </HorizontalStackLayout>
