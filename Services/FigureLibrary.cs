@@ -70,6 +70,31 @@ public class FigureLibrary
         return File.ReadAllBytes(path);
     }
 
+    public byte[]? ReadBytesByRelPath(string relPath)
+    {
+        try
+        {
+            var path = Path.Combine(_binDir, relPath.Replace('/', Path.DirectorySeparatorChar));
+            return File.Exists(path) ? File.ReadAllBytes(path) : null;
+        }
+        catch { return null; }
+    }
+
+    // Overwrites the local .bin for a figure (used to persist a vehicle/gadget
+    // that the game built, captured from the console). Only writes if the file
+    // already exists (won't create stray files).
+    public bool SaveBytesByRelPath(string relPath, byte[] bytes)
+    {
+        try
+        {
+            var path = Path.Combine(_binDir, relPath.Replace('/', Path.DirectorySeparatorChar));
+            if (!File.Exists(path)) return false;
+            File.WriteAllBytes(path, bytes);
+            return true;
+        }
+        catch { return false; }
+    }
+
     // Imports a Dimensions zip: extracts Characters/Vehicles/Gadgets *.bin.
     public async Task<int> ImportZipAsync(Stream zipStream)
     {

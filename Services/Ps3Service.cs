@@ -154,6 +154,27 @@ public class Ps3Service
         return result;
     }
 
+    // Downloads the current figureN.bin for a slot from the console (the plugin
+    // writes the game's tag changes back to it). Returns the 180-byte tag, or
+    // null if absent/unreadable. Used to capture vehicles/gadgets the game
+    // built so we can persist them to the local library.
+    public async Task<byte[]?> DownloadSlotAsync(string slot, CancellationToken ct = default)
+    {
+        if (!SlotMap.Files.TryGetValue(slot, out var fname)) return null;
+        await _lock.WaitAsync(ct);
+        try
+        {
+            await using var c = NewClient();
+            await c.Connect(ct);
+            var path = $"{FigureDir}/{fname}";
+            if (!await c.FileExists(path, ct)) return null;
+            var bytes = await c.DownloadBytes(path, ct);
+            return (bytes is { Length: 180 }) ? bytes : null;
+        }
+        catch { return null; }
+        finally { _lock.Release(); }
+    }
+
     // Path of the LED mirror file the plugin writes (center/left/right colors).
     static string LedsPath => $"{FigureDir}/leds.txt";
 

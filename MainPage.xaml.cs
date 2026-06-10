@@ -787,6 +787,7 @@ public partial class MainPage : ContentPage
         if (!await EnsureConnectedAsync()) return;
         try
         {
+            await TryCaptureBuiltAsync(id);   // capture a built vehicle/gadget before lifting it
             await _ps3.RemoveAsync(id);
             vm.Clear();
             if (_selectedSlot == id) _selectedSlot = null;
@@ -794,6 +795,36 @@ public partial class MainPage : ContentPage
             await Toast(Loc.T("removed", id));
         }
         catch (Exception ex) { await Toast(Loc.T("err.fmt", ex.Message)); }
+    }
+
+    // If the slot holds a vehicle/gadget and the game has written build data to
+    // it (tag differs from our local copy), download the console's tag and save
+    // it over the local .bin, so next time the figure goes in already built.
+    async Task TryCaptureBuiltAsync(string id)
+    {
+        try
+        {
+            var vm = _slots[id];
+            var rel = vm.RelPath;
+            if (string.IsNullOrEmpty(rel)) return;
+            bool isVehGad = rel.StartsWith("Vehicles/", StringComparison.OrdinalIgnoreCase)
+                         || rel.StartsWith("Gadgets/", StringComparison.OrdinalIgnoreCase);
+            if (!isVehGad) return;
+
+            var local = _lib.ReadBytesByRelPath(rel);
+            if (local is null || local.Length != 180) return;
+
+            var built = await _ps3.DownloadSlotAsync(id);
+            if (built is null || built.Length != 180) return;
+            if (built.AsSpan().SequenceEqual(local)) return;   // nothing new
+
+            if (_lib.SaveBytesByRelPath(rel, built))
+            {
+                var name = System.IO.Path.GetFileNameWithoutExtension(rel);
+                await Toast(Loc.T("vehicle.saved", name));
+            }
+        }
+        catch { /* capture is best-effort; never block removal */ }
     }
 
     void RefreshAllSlotVisuals()
@@ -1007,6 +1038,10 @@ public partial class MainPage : ContentPage
     {
         try
         {
+            // capture any built vehicles/gadgets currently on the pad
+            foreach (var slot in _slots.Keys.ToList())
+                await TryCaptureBuiltAsync(slot);
+
             var state = await _ps3.StateAsync();
             foreach (var (slot, present) in state)
             {
