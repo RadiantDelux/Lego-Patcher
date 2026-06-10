@@ -28,7 +28,7 @@ pad's shape.
 
 **PS4**
 - PS4 with **GoldHEN** (Plugin Loader) and its FTP server enabled.
-- LEGO Dimensions **CUSA00935**.
+- LEGO Dimensions **CUSA00935**, updated to **1.23**.
 
 ## Usage
 

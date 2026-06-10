@@ -55,6 +55,20 @@ public static class AppSettings
 
     public static bool IsEnglish => string.Equals(Language, "en", StringComparison.OrdinalIgnoreCase);
 
+    // True once the user has explicitly picked a language on first run.
+    public static bool LanguageChosen
+    {
+        get => Preferences.Get(nameof(LanguageChosen), false);
+        set => Preferences.Set(nameof(LanguageChosen), value);
+    }
+
+    // True once the "how vehicles/gadgets are saved" tip has been shown.
+    public static bool VehicleTipShown
+    {
+        get => Preferences.Get(nameof(VehicleTipShown), false);
+        set => Preferences.Set(nameof(VehicleTipShown), value);
+    }
+
     public static bool IsPs4 => string.Equals(Platform, "ps4", StringComparison.OrdinalIgnoreCase);
 
     public static bool DimensionsImported

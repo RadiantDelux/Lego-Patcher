@@ -368,6 +368,19 @@ public partial class MainPage : ContentPage
         // Pequeña espera para asegurar que la ventana ya tiene XamlRoot.
         await Task.Delay(400);
 
+        // First thing on first run: let the user pick a language.
+        if (!AppSettings.LanguageChosen)
+        {
+            string pick = await DisplayActionSheet("Idioma / Language", null, null,
+                "Español", "English");
+            if (pick == "English") AppSettings.Language = "en";
+            else if (pick == "Español") AppSettings.Language = "es";
+            AppSettings.LanguageChosen = true;
+            ApplyLanguage();
+            RefreshPlatformUi();
+            SetConnected(_connected);
+        }
+
         if (!_lib.HasFigures)
         {
             string extra = DeviceInfo.Platform == DevicePlatform.iOS ? Loc.T("import.ios") : "";
@@ -827,6 +840,18 @@ public partial class MainPage : ContentPage
         catch { /* capture is best-effort; never block removal */ }
     }
 
+    // First time a vehicle or gadget is placed, explain how building/saving
+    // works (the game builds them; the app then saves the built tag).
+    async Task ShowVehicleTipIfNeeded(string? relPath)
+    {
+        if (AppSettings.VehicleTipShown || string.IsNullOrEmpty(relPath)) return;
+        bool isVehGad = relPath.StartsWith("Vehicles/", StringComparison.OrdinalIgnoreCase)
+                     || relPath.StartsWith("Gadgets/", StringComparison.OrdinalIgnoreCase);
+        if (!isVehGad) return;
+        AppSettings.VehicleTipShown = true;
+        await DisplayAlert(Loc.T("vehicle.tip.title"), Loc.T("vehicle.tip.body"), Loc.T("ok"));
+    }
+
     void RefreshAllSlotVisuals()
     {
         foreach (var id in _slots.Keys) UpdateSlotVisual(id);
@@ -866,6 +891,7 @@ public partial class MainPage : ContentPage
             var bytes = _lib.ReadBytes(f);
             await _ps3.PlaceAsync(slot, bytes);
             await Toast(Loc.T("placed", f.Name, slot));
+            await ShowVehicleTipIfNeeded(f.RelPath);
         }
         catch (Exception ex)
         {
@@ -908,6 +934,7 @@ public partial class MainPage : ContentPage
                 _selectedSlot = null;
                 RefreshAllSlotVisuals();
                 await Toast(Loc.T("placed", f.Name, dstSlot));
+                await ShowVehicleTipIfNeeded(f.RelPath);
             }
             else if (kind == "slot")
             {
