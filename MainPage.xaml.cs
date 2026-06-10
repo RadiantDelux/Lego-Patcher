@@ -624,18 +624,16 @@ public partial class MainPage : ContentPage
 
         double size = center ? 54 : 44;
 
-        var img = new Image { Aspect = Aspect.AspectFit, WidthRequest = size * 0.95, HeightRequest = size * 0.7, InputTransparent = true };
+        // Thumb fills the slot proportionally so it scales with the pad on any
+        // screen size (no fixed pixel size, which looked off on phones).
+        var img = new Image
+        {
+            Aspect = Aspect.AspectFit, InputTransparent = true,
+            HorizontalOptions = LayoutOptions.Fill, VerticalOptions = LayoutOptions.Fill,
+            Margin = new Thickness(2),
+        };
         img.SetBinding(Image.SourceProperty, new Binding(nameof(SlotVm.Thumb)));
         img.SetBinding(IsVisibleProperty, new Binding(nameof(SlotVm.HasThumb)));
-
-        var nameLabel = new Label
-        {
-            FontSize = 8, TextColor = Color.FromArgb("#1a1a1a"),
-            HorizontalTextAlignment = TextAlignment.Center,
-            LineBreakMode = LineBreakMode.TailTruncation, MaxLines = 1,
-            InputTransparent = true,
-        };
-        nameLabel.SetBinding(Label.TextProperty, new Binding(nameof(SlotVm.DisplayName)));
 
         // Remove (X) button, top-right, visible only when slot is filled.
         var removeBtn = new Button
@@ -651,17 +649,10 @@ public partial class MainPage : ContentPage
         removeBtn.SetBinding(IsVisibleProperty, new Binding(nameof(SlotVm.Filled)));
         removeBtn.Clicked += async (_, _) => await RemoveSlotAsync(id);
 
-        var stack = new VerticalStackLayout
-        {
-            Spacing = 1, Padding = 2,
-            HorizontalOptions = LayoutOptions.Center, VerticalOptions = LayoutOptions.Center,
-            InputTransparent = true, CascadeInputTransparent = true,
-            Children = { img, nameLabel },
-        };
-
-        // Slot sits ON TOP of the Toy Pad image, so keep it transparent: the
-        // pad's white zone shows through, and the figure thumb floats on it.
-        var inner = new Grid { InputTransparent = false, Children = { stack, removeBtn } };
+        // Thumb fills the slot; the remove (X) button floats on top-right. No
+        // name label on the pad itself (it's shown in the library) — keeps the
+        // small slots clean and scalable on phones.
+        var inner = new Grid { InputTransparent = false, Children = { img, removeBtn } };
 
         var border = new Border
         {
