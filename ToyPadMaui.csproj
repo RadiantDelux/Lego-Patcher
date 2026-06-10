@@ -45,10 +45,19 @@
 
 	<ItemGroup>
 		<!-- App Icon -->
-		<MauiIcon Include="Resources\AppIcon\appicon.png"
+		<!-- Android: adaptive icon (logo foreground over solid background, scaled
+		     so it isn't clipped/blank). -->
+		<MauiIcon Condition="$(TargetFramework.Contains('-android'))"
+		          Include="Resources\AppIcon\appicon.png"
 		          ForegroundFile="Resources\AppIcon\appicon.png"
 		          Color="#0e0d12"
 		          ForegroundScale="0.62" />
+		<!-- iOS/Windows: single flattened icon. Using a ForegroundFile equal to
+		     Include makes iOS draw the image twice (base + overlay), so here we
+		     pass only the image + background color. -->
+		<MauiIcon Condition="!$(TargetFramework.Contains('-android'))"
+		          Include="Resources\AppIcon\appicon.png"
+		          Color="#0e0d12" />
 
 
 		<!-- Splash Screen -->
