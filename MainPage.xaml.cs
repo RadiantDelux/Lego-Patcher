@@ -469,9 +469,14 @@ public partial class MainPage : ContentPage
         double sw = c.w * w;
         double sh = c.h * w;   // both relative to width so they stay stable
         b.WidthRequest = sw; b.HeightRequest = sh;
-        b.RotationX = c.rx;
-        b.RotationY = c.ry;
-        b.Rotation  = c.rz;
+        // 3D perspective (RotationX/Y) renders inconsistently on Android/iOS and
+        // looks skewed there, so keep figures flat on mobile and only tilt on
+        // desktop (where it reads as the pad's perspective).
+        bool flat = DeviceInfo.Platform == DevicePlatform.Android
+                 || DeviceInfo.Platform == DevicePlatform.iOS;
+        b.RotationX = flat ? 0 : c.rx;
+        b.RotationY = flat ? 0 : c.ry;
+        b.Rotation  = flat ? 0 : c.rz;
         AbsoluteLayout.SetLayoutFlags(b, Microsoft.Maui.Layouts.AbsoluteLayoutFlags.None);
         AbsoluteLayout.SetLayoutBounds(b, new Rect(c.x * w - sw / 2, c.y * h - sh / 2, sw, sh));
     }
