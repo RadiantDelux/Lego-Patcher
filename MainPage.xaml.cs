@@ -12,7 +12,6 @@ public partial class MainPage : ContentPage
 
     readonly Dictionary<string, SlotVm> _slots = new();
     readonly Dictionary<string, Border> _slotViews = new();
-    readonly Dictionary<string, Label> _slotLabels = new();   // name shown above slot (mobile)
     string? _selectedSlot;          // slot awaiting a figure tap
     string _curCat = "all";
     string _curQuery = "";
@@ -495,16 +494,6 @@ public partial class MainPage : ContentPage
         AbsoluteLayout.SetLayoutFlags(b, Microsoft.Maui.Layouts.AbsoluteLayoutFlags.None);
         double left = c.x * w - sw / 2, top = c.y * h - sh / 2;
         AbsoluteLayout.SetLayoutBounds(b, new Rect(left, top, sw, sh));
-
-        // Name label sits just above the slot (mobile only).
-        if (_slotLabels.TryGetValue(id, out var lbl))
-        {
-            double lw = Math.Max(sw * 1.7, 70);
-            double lh = 16;
-            AbsoluteLayout.SetLayoutFlags(lbl, Microsoft.Maui.Layouts.AbsoluteLayoutFlags.None);
-            AbsoluteLayout.SetLayoutBounds(lbl,
-                new Rect(c.x * w - lw / 2, top - lh - 1, lw, lh));
-        }
     }
 
     // ---- per-slot panel lighting --------------------------------------------
@@ -725,26 +714,6 @@ public partial class MainPage : ContentPage
 
         _slotViews[id] = border;
         PadOverlay.Add(border);
-
-        // Figure name above the slot (mobile only; desktop shows it in the
-        // library and the tilt keeps the pad clean). Lives in the overlay so it
-        // isn't clipped by the slot's rounded/elliptical border.
-        if (IsMobile)
-        {
-            var nameLbl = new Label
-            {
-                FontSize = 10, LineBreakMode = LineBreakMode.TailTruncation,
-                MaxLines = 1, InputTransparent = true,
-                TextColor = Color.FromArgb("#f2f2f5"),
-                HorizontalTextAlignment = TextAlignment.Center,
-                VerticalTextAlignment = TextAlignment.End,
-                BindingContext = vm,
-            };
-            nameLbl.SetBinding(Label.TextProperty, new Binding(nameof(SlotVm.Name)));
-            nameLbl.SetBinding(IsVisibleProperty, new Binding(nameof(SlotVm.Filled)));
-            _slotLabels[id] = nameLbl;
-            PadOverlay.Add(nameLbl);
-        }
 
         vm.PropertyChanged += (_, _) => UpdateSlotVisual(id);
     }
