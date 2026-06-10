@@ -12,6 +12,7 @@ public partial class MainPage : ContentPage
 
     readonly Dictionary<string, SlotVm> _slots = new();
     readonly Dictionary<string, Border> _slotViews = new();
+    readonly Dictionary<string, Label> _slotLabels = new();   // name shown above slot (mobile)
     string? _selectedSlot;          // slot awaiting a figure tap
     string _curCat = "all";
     string _curQuery = "";
@@ -462,23 +463,48 @@ public partial class MainPage : ContentPage
     double SlotW(string id) => Calib(id).w;
     double SlotH(string id) => Calib(id).h;
 
+    static bool IsMobile =>
+        DeviceInfo.Platform == DevicePlatform.Android
+     || DeviceInfo.Platform == DevicePlatform.iOS;
+
     void LayoutSlot(string id, double w, double h)
     {
         if (!_slotViews.TryGetValue(id, out var b)) return;
         var c = Calib(id);
-        double sw = c.w * w;
-        double sh = c.h * w;   // both relative to width so they stay stable
+        bool flat = IsMobile;
+        // On mobile there's no 3D tilt, so the per-slot foreshortened sizes look
+        // uneven. Use one uniform size for all side slots (center a bit bigger,
+        // it's the round panel) so the pad reads cleanly. Desktop keeps the
+        // measured perspective sizes.
+        double cw, ch;
+        if (flat)
+        {
+            bool center = id == "C";
+            cw = ch = center ? 0.185 : 0.150;
+        }
+        else { cw = c.w; ch = c.h; }
+        double sw = cw * w;
+        double sh = ch * w;   // both relative to width so they stay stable
         b.WidthRequest = sw; b.HeightRequest = sh;
         // 3D perspective (RotationX/Y) renders inconsistently on Android/iOS and
         // looks skewed there, so keep figures flat on mobile and only tilt on
         // desktop (where it reads as the pad's perspective).
-        bool flat = DeviceInfo.Platform == DevicePlatform.Android
-                 || DeviceInfo.Platform == DevicePlatform.iOS;
         b.RotationX = flat ? 0 : c.rx;
         b.RotationY = flat ? 0 : c.ry;
         b.Rotation  = flat ? 0 : c.rz;
         AbsoluteLayout.SetLayoutFlags(b, Microsoft.Maui.Layouts.AbsoluteLayoutFlags.None);
-        AbsoluteLayout.SetLayoutBounds(b, new Rect(c.x * w - sw / 2, c.y * h - sh / 2, sw, sh));
+        double left = c.x * w - sw / 2, top = c.y * h - sh / 2;
+        AbsoluteLayout.SetLayoutBounds(b, new Rect(left, top, sw, sh));
+
+        // Name label sits just above the slot (mobile only).
+        if (_slotLabels.TryGetValue(id, out var lbl))
+        {
+            double lw = Math.Max(sw * 1.7, 70);
+            double lh = 16;
+            AbsoluteLayout.SetLayoutFlags(lbl, Microsoft.Maui.Layouts.AbsoluteLayoutFlags.None);
+            AbsoluteLayout.SetLayoutBounds(lbl,
+                new Rect(c.x * w - lw / 2, top - lh - 1, lw, lh));
+        }
     }
 
     // ---- per-slot panel lighting --------------------------------------------
@@ -699,6 +725,26 @@ public partial class MainPage : ContentPage
 
         _slotViews[id] = border;
         PadOverlay.Add(border);
+
+        // Figure name above the slot (mobile only; desktop shows it in the
+        // library and the tilt keeps the pad clean). Lives in the overlay so it
+        // isn't clipped by the slot's rounded/elliptical border.
+        if (IsMobile)
+        {
+            var nameLbl = new Label
+            {
+                FontSize = 10, LineBreakMode = LineBreakMode.TailTruncation,
+                MaxLines = 1, InputTransparent = true,
+                TextColor = Color.FromArgb("#f2f2f5"),
+                HorizontalTextAlignment = TextAlignment.Center,
+                VerticalTextAlignment = TextAlignment.End,
+                BindingContext = vm,
+            };
+            nameLbl.SetBinding(Label.TextProperty, new Binding(nameof(SlotVm.Name)));
+            nameLbl.SetBinding(IsVisibleProperty, new Binding(nameof(SlotVm.Filled)));
+            _slotLabels[id] = nameLbl;
+            PadOverlay.Add(nameLbl);
+        }
 
         vm.PropertyChanged += (_, _) => UpdateSlotVisual(id);
     }
