@@ -4,7 +4,7 @@ Software emulator of the LEGO Dimensions **Toy Pad** for **PS3 and PS4**. Place
 characters, vehicles and gadgets in the game without the physical portal or real
 figures — pick them in the app and they appear on the console instantly.
 
-Cross-platform .NET MAUI app: **Windows, Android, iOS and macOS**.
+Cross-platform .NET MAUI app: **Windows, Android and iOS**.
 
 ## How it works
 
@@ -58,8 +58,8 @@ dotnet build -c Release -f net10.0-windows10.0.19041.0
 ```
 
 Other platforms build in GitHub Actions (see `.github/workflows/build.yml`):
-Android on the Ubuntu runner, iOS/macOS on the macOS runner. The `.ipa`/`.app`
-come out unsigned (you need your own Apple certificate to install).
+Android on the Ubuntu runner, iOS on the macOS runner. The `.ipa` comes out
+unsigned (you need your own Apple certificate to install).
 
 ## Credits
 
