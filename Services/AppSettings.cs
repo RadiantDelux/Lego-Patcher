@@ -42,4 +42,22 @@ public static class AppSettings
         get => Preferences.Get(nameof(DimensionsImported), false);
         set => Preferences.Set(nameof(DimensionsImported), value);
     }
+
+    // ---- Pad light-zone geometry (editor) -----------------------------------
+    // Each zone is x,y,w,h as a fraction of the pad image (0..1). Defaults are
+    // measured from legoportal.png; the in-app editor can fine-tune them.
+    public static double GetZone(string key, double def) => Preferences.Get("zone_" + key, def);
+    public static void SetZone(string key, double v) => Preferences.Set("zone_" + key, v);
+
+    public static void ResetZones()
+    {
+        var keys = new System.Collections.Generic.List<string>();
+        foreach (var id in new[] { "L1","L2","L3","C","R1","R2","R3" })
+        {
+            keys.Add("S" + id + "x"); keys.Add("S" + id + "y");
+            keys.Add("S" + id + "w"); keys.Add("S" + id + "h");
+            keys.Add("R" + id + "x"); keys.Add("R" + id + "y"); keys.Add("R" + id + "z");
+        }
+        foreach (var k in keys) Preferences.Remove("zone_" + k);
+    }
 }

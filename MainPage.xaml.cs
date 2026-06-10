@@ -26,8 +26,10 @@ public partial class MainPage : ContentPage
         InitializeComponent();
         _ps3 = ps3;
         _lib = lib;
+        BuildPanelGlows();
         BuildSlots();
         SizeChanged += OnPageSizeChanged;
+        PadImageWrap.SizeChanged += OnPadWrapSizeChanged;
         RefreshPlatformUi();
         _ = InitAsync();
     }
@@ -65,10 +67,10 @@ public partial class MainPage : ContentPage
 
     void ResetLedBars()
     {
-        var off = Color.FromArgb("#222230");
-        ApplyLedPanel(LedLeft, off, false);
-        ApplyLedPanel(LedCenter, off, false);
-        ApplyLedPanel(LedRight, off, false);
+        _panelColor[0] = _panelColor[1] = _panelColor[2] = null;
+        foreach (var b in _slotViews.Values) AnimateSlotGlow(b, Colors.Transparent);
+        ApplyPanelGlow(_glowL, 1);
+        ApplyPanelGlow(_glowR, 2);
     }
 
     async Task PollLedsAsync()
@@ -79,66 +81,15 @@ public partial class MainPage : ContentPage
         {
             var colors = await _ps3.ReadLedsAsync();   // [center, left, right] or null
             if (colors is null) return;
-            // file order is center, left, right
-            SetLedPanel(LedCenter, colors[0]);
-            SetLedPanel(LedLeft,   colors[1]);
-            SetLedPanel(LedRight,  colors[2]);
+            _panelColor[0] = colors[0];   // center
+            _panelColor[1] = colors[1];   // left
+            _panelColor[2] = colors[2];   // right
+            foreach (var id in _slots.Keys) ApplyLedToSlot(id);
+            ApplyPanelGlow(_glowL, 1);    // left area fill
+            ApplyPanelGlow(_glowR, 2);    // right area fill
         }
         catch { /* transient FTP errors: keep last colors */ }
         finally { _ledBusy = false; }
-    }
-
-    void SetLedPanel(Border? panel, string hex)
-    {
-        if (panel is null) return;
-        var c = ParseLed(hex);
-        bool on = !(c.Red == 0 && c.Green == 0 && c.Blue == 0);
-        ApplyLedPanel(panel, c, on);
-    }
-
-    // Tint the whole zone: bright stroke + a translucent fill of the same hue
-    // so the panel "glows" the LED color. Off = neutral dark. Transitions are
-    // animated so colors fade smoothly instead of snapping.
-    void ApplyLedPanel(Border? panel, Color c, bool on)
-    {
-        if (panel is null) return;
-        Color targetStroke, targetFill;
-        if (on)
-        {
-            targetStroke = c;
-            targetFill = new Color(c.Red, c.Green, c.Blue, 0.22f);
-        }
-        else
-        {
-            targetStroke = Color.FromArgb("#222230");
-            targetFill = Color.FromArgb("#14181820");
-        }
-        AnimateLedPanel(panel, targetStroke, targetFill);
-    }
-
-    // Smoothly cross-fade a panel's stroke + background to the target colors
-    // over ~450ms. Cancels any in-flight fade on that panel first.
-    void AnimateLedPanel(Border panel, Color toStroke, Color toFill)
-    {
-        const uint ms = 450;
-        string name = "ledfade";
-
-        var fromStroke = (panel.Stroke as SolidColorBrush)?.Color
-                         ?? Color.FromArgb("#222230");
-        var fromFill = panel.BackgroundColor ?? Color.FromArgb("#14181820");
-
-        // already at target? skip.
-        if (ColorsClose(fromStroke, toStroke) && ColorsClose(fromFill, toFill))
-            return;
-
-        panel.AbortAnimation(name);
-        var anim = new Animation(t =>
-        {
-            float f = (float)t;
-            panel.Stroke = Lerp(fromStroke, toStroke, f);
-            panel.BackgroundColor = Lerp(fromFill, toFill, f);
-        }, 0, 1, Easing.CubicInOut);
-        anim.Commit(panel, name, length: ms);
     }
 
     static bool ColorsClose(Color a, Color b)
@@ -475,79 +426,248 @@ public partial class MainPage : ContentPage
                 FileSystem.OpenAppPackageFileAsync("wallpaper.jpg").Result);
             LogoImage.Source = ImageSource.FromStream(() =>
                 FileSystem.OpenAppPackageFileAsync("legopatcher.png").Result);
+            PadImage.Source = ImageSource.FromStream(() =>
+                FileSystem.OpenAppPackageFileAsync("legoportal.png").Result);
         }
         catch { /* assets optional */ }
         await Task.CompletedTask;
+    }
+
+    void OnPadWrapSizeChanged(object? sender, EventArgs e)
+    {
+        double w = PadImageWrap.Width;
+        if (w <= 0) return;
+        double targetH = w * 0.75;          // 4:3 image
+        if (Math.Abs(PadImageWrap.HeightRequest - targetH) > 0.5)
+            PadImageWrap.HeightRequest = targetH;
+        LayoutPadZones();
+    }
+
+    void LayoutPadZones()
+    {
+        double w = PadImageWrap.Width;
+        double h = PadImageWrap.Height > 0 ? PadImageWrap.Height : w * 0.75;
+        if (w <= 0 || h <= 0) return;
+        LayoutGlow(_glowL, ContourL, w, h);
+        LayoutGlow(_glowR, ContourR, w, h);
+        foreach (var id in _slots.Keys) LayoutSlot(id, w, h);
+    }
+
+    // Slot center position (fraction of pad) from the fixed factory calibration.
+    (double x, double y) SlotPos(string id) { var c = Calib(id); return (c.x, c.y); }
+    double SlotW(string id) => Calib(id).w;
+    double SlotH(string id) => Calib(id).h;
+
+    void LayoutSlot(string id, double w, double h)
+    {
+        if (!_slotViews.TryGetValue(id, out var b)) return;
+        var c = Calib(id);
+        double sw = c.w * w;
+        double sh = c.h * w;   // both relative to width so they stay stable
+        b.WidthRequest = sw; b.HeightRequest = sh;
+        b.RotationX = c.rx;
+        b.RotationY = c.ry;
+        b.Rotation  = c.rz;
+        AbsoluteLayout.SetLayoutFlags(b, Microsoft.Maui.Layouts.AbsoluteLayoutFlags.None);
+        AbsoluteLayout.SetLayoutBounds(b, new Rect(c.x * w - sw / 2, c.y * h - sh / 2, sw, sh));
+    }
+
+    // ---- per-slot panel lighting --------------------------------------------
+    // Each figure lights up with its panel's color: L*=left, C=center, R*=right.
+    // colors from ReadLeds are ordered [center, left, right].
+    readonly string?[] _panelColor = new string?[3]; // 0=center,1=left,2=right
+
+    // Panel-fill polygons: the whole white L-area of each side lights up so the
+    // gaps between figures are colored too. Contours traced from legoportal.png.
+    Microsoft.Maui.Controls.Shapes.Polygon? _glowL, _glowR;
+    static readonly double[] ContourL = {
+        0.339,0.434, 0.340,0.445, 0.340,0.453, 0.339,0.462, 0.338,0.470, 0.337,0.479,
+        0.336,0.487, 0.335,0.496, 0.334,0.504, 0.333,0.513, 0.332,0.521, 0.331,0.529,
+        0.330,0.538, 0.329,0.546, 0.328,0.555, 0.327,0.562, 0.326,0.572, 0.326,0.579,
+        0.325,0.589, 0.326,0.596, 0.390,0.605, 0.404,0.613, 0.418,0.621, 0.435,0.630,
+        0.448,0.638, 0.465,0.647, 0.466,0.655, 0.466,0.664, 0.466,0.672, 0.465,0.681,
+        0.465,0.689, 0.465,0.697, 0.465,0.706, 0.464,0.714, 0.464,0.723, 0.464,0.730,
+        0.464,0.740, 0.464,0.747, 0.464,0.757, 0.463,0.764, 0.194,0.777, 0.146,0.777,
+        0.148,0.764, 0.150,0.757, 0.152,0.747, 0.154,0.740, 0.156,0.730, 0.157,0.723,
+        0.159,0.714, 0.161,0.706, 0.163,0.697, 0.165,0.689, 0.166,0.681, 0.168,0.672,
+        0.170,0.664, 0.172,0.655, 0.174,0.647, 0.176,0.638, 0.177,0.630, 0.179,0.621,
+        0.181,0.613, 0.183,0.605, 0.185,0.596, 0.187,0.589, 0.188,0.579, 0.189,0.572,
+        0.191,0.562, 0.193,0.555, 0.194,0.546, 0.196,0.538, 0.198,0.529, 0.200,0.521,
+        0.202,0.513, 0.204,0.504, 0.205,0.496, 0.207,0.487, 0.209,0.479, 0.211,0.470,
+        0.212,0.462, 0.214,0.453, 0.216,0.445, 0.222,0.434 };
+    static readonly double[] ContourR = {
+        0.785,0.431, 0.791,0.443, 0.792,0.451, 0.794,0.460, 0.796,0.467, 0.798,0.477,
+        0.800,0.484, 0.802,0.493, 0.804,0.501, 0.806,0.510, 0.808,0.518, 0.810,0.526,
+        0.812,0.535, 0.813,0.543, 0.815,0.552, 0.817,0.560, 0.819,0.569, 0.821,0.577,
+        0.823,0.586, 0.825,0.594, 0.827,0.603, 0.829,0.611, 0.830,0.618, 0.832,0.628,
+        0.834,0.635, 0.836,0.645, 0.838,0.652, 0.840,0.661, 0.842,0.669, 0.844,0.678,
+        0.846,0.686, 0.848,0.694, 0.850,0.703, 0.852,0.711, 0.854,0.720, 0.855,0.728,
+        0.857,0.737, 0.859,0.745, 0.861,0.754, 0.863,0.762, 0.582,0.775, 0.548,0.775,
+        0.547,0.762, 0.547,0.754, 0.547,0.745, 0.546,0.737, 0.546,0.728, 0.546,0.720,
+        0.545,0.711, 0.545,0.703, 0.545,0.694, 0.544,0.686, 0.544,0.678, 0.544,0.669,
+        0.543,0.661, 0.543,0.652, 0.543,0.645, 0.554,0.635, 0.568,0.628, 0.585,0.618,
+        0.599,0.611, 0.613,0.603, 0.680,0.594, 0.681,0.586, 0.681,0.577, 0.680,0.569,
+        0.679,0.560, 0.678,0.552, 0.677,0.543, 0.676,0.535, 0.675,0.526, 0.674,0.518,
+        0.673,0.510, 0.672,0.501, 0.671,0.493, 0.670,0.484, 0.669,0.477, 0.668,0.467,
+        0.667,0.460, 0.666,0.451, 0.665,0.443, 0.669,0.431 };
+
+    void BuildPanelGlows()
+    {
+        Microsoft.Maui.Controls.Shapes.Polygon Make()
+        {
+            var p = new Microsoft.Maui.Controls.Shapes.Polygon
+            {
+                Stroke = new SolidColorBrush(Colors.Transparent),
+                StrokeThickness = 0,
+                Fill = new SolidColorBrush(Colors.Transparent),
+                InputTransparent = true,
+            };
+            AbsoluteLayout.SetLayoutFlags(p, Microsoft.Maui.Layouts.AbsoluteLayoutFlags.All);
+            AbsoluteLayout.SetLayoutBounds(p, new Rect(0, 0, 1, 1));
+            PadOverlay.Add(p);   // added before slots -> sits behind them
+            return p;
+        }
+        _glowL = Make();
+        _glowR = Make();
+    }
+
+    void LayoutGlow(Microsoft.Maui.Controls.Shapes.Polygon? poly, double[] c, double w, double h)
+    {
+        if (poly is null) return;
+        var pc = poly.Points;
+        pc.Clear();
+        for (int i = 0; i + 1 < c.Length; i += 2) pc.Add(new Point(c[i] * w, c[i + 1] * h));
+    }
+
+    void ApplyPanelGlow(Microsoft.Maui.Controls.Shapes.Polygon? poly, int panel)
+    {
+        if (poly is null) return;
+        var hex = _panelColor[panel];
+        Color c = hex is null ? Colors.Black : ParseLed(hex);
+        bool on = !(c.Red == 0 && c.Green == 0 && c.Blue == 0);
+        var to = on ? new Color(c.Red, c.Green, c.Blue, 0.42f) : Colors.Transparent;
+        var from = (poly.Fill as SolidColorBrush)?.Color ?? Colors.Transparent;
+        if (ColorsClose(from, to)) return;
+        poly.AbortAnimation("pg");
+        var anim = new Animation(t => poly.Fill = new SolidColorBrush(Lerp(from, to, (float)t)),
+                                 0, 1, Easing.CubicInOut);
+        anim.Commit(poly, "pg", length: 450);
+    }
+
+    static int SlotPanel(string id) => id == "C" ? 0 : (id[0] == 'L' ? 1 : 2);
+
+    void ApplyLedToSlot(string id)
+    {
+        if (!_slotViews.TryGetValue(id, out var b)) return;
+        var hex = _panelColor[SlotPanel(id)];
+        Color c = hex is null ? Colors.Black : ParseLed(hex);
+        bool on = !(c.Red == 0 && c.Green == 0 && c.Blue == 0);
+        AnimateSlotGlow(b, on ? new Color(c.Red, c.Green, c.Blue, 0.55f) : Colors.Transparent);
+    }
+
+    void AnimateSlotGlow(Border panel, Color toFill)
+    {
+        const uint ms = 450; string name = "ledfade";
+        var from = panel.BackgroundColor ?? Colors.Transparent;
+        if (ColorsClose(from, toFill)) return;
+        panel.AbortAnimation(name);
+        var anim = new Animation(t => panel.BackgroundColor = Lerp(from, toFill, (float)t),
+                                 0, 1, Easing.CubicInOut);
+        anim.Commit(panel, name, length: ms);
     }
 
     // ---- slot construction --------------------------------------------------
 
     void BuildSlots()
     {
-        AddSlot(ZoneL, "L1", "1"); AddSlot(ZoneL, "L2", "2"); AddSlot(ZoneL, "L3", "3");
-        AddSlot(ZoneC, "C", "C", center: true);
-        AddSlot(ZoneR, "R1", "1"); AddSlot(ZoneR, "R2", "2"); AddSlot(ZoneR, "R3", "3");
+        AddSlot("L1", "1"); AddSlot("L2", "2"); AddSlot("L3", "3");
+        AddSlot("C", "C", center: true);
+        AddSlot("R1", "1"); AddSlot("R2", "2"); AddSlot("R3", "3");
     }
 
-    void AddSlot(Layout parent, string id, string tag, bool center = false)
+    // Default center positions (fraction of the pad) for each slot. The three
+    // figures on a side are SEPARATED vertically; all are editable.
+    static (double x, double y) SlotDefault(string id)
+    {
+        var c = Calib(id);
+        return (c.x, c.y);
+    }
+
+    // Factory calibration per slot: position, size and 3D perspective. Measured
+    // by hand on legoportal.png and symmetrized left/right. Used as the default
+    // when there's no saved value; the editor + "Pegar valores" can override.
+    static (double x, double y, double w, double h, double rx, double ry, double rz) Calib(string id) => id switch
+    {
+        // Derived from the white-area contour of legoportal.png: each side is a
+        // foreshortened trapezoid that widens downward, so two figures sit on
+        // the wide lower part and one on the narrower upper part. Symmetrized.
+        // L1/R1/C kept (verified good); the 4 lower slots restored to the
+        // hand-validated values (sit higher, y~0.68, on the wide lower band).
+        "L1" => (0.266, 0.510, 0.140, 0.150, 35, -16, 0),  // upper-outer
+        "L2" => (0.243, 0.686, 0.157, 0.164, 39, -14, 0),  // lower-outer
+        "L3" => (0.395, 0.685, 0.147, 0.157, 33,  -9, 0),  // lower-inner
+        "C"  => (0.500, 0.449, 0.212, 0.178, 28,   0, 0),
+        "R1" => (0.734, 0.510, 0.140, 0.150, 35,  16, 0),
+        "R2" => (0.767, 0.676, 0.160, 0.180, 43,  15, 0),
+        "R3" => (0.614, 0.682, 0.147, 0.153, 31,   9, 0),
+        _    => (0.5, 0.5, 0.075, 0.075, 0, 0, 0),
+    };
+
+    void AddSlot(string id, string tag, bool center = false)
     {
         var vm = new SlotVm { Id = id, Tag = tag };
         _slots[id] = vm;
 
-        double size = center ? 96 : 88;
+        double size = center ? 54 : 44;
 
-        var img = new Image { Aspect = Aspect.AspectFit, WidthRequest = size * 0.78, HeightRequest = size * 0.55, InputTransparent = true };
+        var img = new Image { Aspect = Aspect.AspectFit, WidthRequest = size * 0.95, HeightRequest = size * 0.7, InputTransparent = true };
         img.SetBinding(Image.SourceProperty, new Binding(nameof(SlotVm.Thumb)));
         img.SetBinding(IsVisibleProperty, new Binding(nameof(SlotVm.HasThumb)));
 
         var nameLabel = new Label
         {
-            FontSize = 11, TextColor = Color.FromArgb("#ececf2"),
+            FontSize = 8, TextColor = Color.FromArgb("#1a1a1a"),
             HorizontalTextAlignment = TextAlignment.Center,
-            LineBreakMode = LineBreakMode.WordWrap, MaxLines = 2,
+            LineBreakMode = LineBreakMode.TailTruncation, MaxLines = 1,
             InputTransparent = true,
         };
         nameLabel.SetBinding(Label.TextProperty, new Binding(nameof(SlotVm.DisplayName)));
 
-        var tagLabel = new Label
-        {
-            Text = tag, FontSize = 10, TextColor = Color.FromArgb("#8a8aa0"),
-            FontAttributes = FontAttributes.Bold,
-            HorizontalOptions = LayoutOptions.Start, VerticalOptions = LayoutOptions.Start,
-            Margin = new Thickness(8, 6, 0, 0), InputTransparent = true,
-        };
-
         // Remove (X) button, top-right, visible only when slot is filled.
         var removeBtn = new Button
         {
-            Text = "✕", FontSize = 9, FontAttributes = FontAttributes.Bold,
+            Text = "✕", FontSize = 8, FontAttributes = FontAttributes.Bold,
             TextColor = Color.FromArgb("#ff8a8a"),
             BackgroundColor = Color.FromArgb("#cc1a1020"),
-            CornerRadius = 9, Padding = 0,
-            WidthRequest = 18, HeightRequest = 18,
+            CornerRadius = 8, Padding = 0,
+            WidthRequest = 15, HeightRequest = 15,
             HorizontalOptions = LayoutOptions.End, VerticalOptions = LayoutOptions.Start,
-            Margin = new Thickness(0, 3, 3, 0),
+            Margin = new Thickness(0, 1, 1, 0),
         };
         removeBtn.SetBinding(IsVisibleProperty, new Binding(nameof(SlotVm.Filled)));
         removeBtn.Clicked += async (_, _) => await RemoveSlotAsync(id);
 
         var stack = new VerticalStackLayout
         {
-            Spacing = 4, Padding = 8,
+            Spacing = 1, Padding = 2,
             HorizontalOptions = LayoutOptions.Center, VerticalOptions = LayoutOptions.Center,
             InputTransparent = true, CascadeInputTransparent = true,
             Children = { img, nameLabel },
         };
 
-        var inner = new Grid { InputTransparent = false, Children = { stack, tagLabel, removeBtn } };
+        // Slot sits ON TOP of the Toy Pad image, so keep it transparent: the
+        // pad's white zone shows through, and the figure thumb floats on it.
+        var inner = new Grid { InputTransparent = false, Children = { stack, removeBtn } };
 
         var border = new Border
         {
-            HeightRequest = size, MinimumWidthRequest = 70, MaximumWidthRequest = size,
-            HorizontalOptions = LayoutOptions.Fill,
-            StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = 6 },
-            Stroke = Color.FromArgb("#3c3c4d"), StrokeThickness = 1,
-            BackgroundColor = Color.FromArgb("#59000000"),
+            HeightRequest = size, WidthRequest = size,
+            HorizontalOptions = LayoutOptions.Center, VerticalOptions = LayoutOptions.Center,
+            StrokeShape = center
+                ? new Microsoft.Maui.Controls.Shapes.Ellipse()
+                : new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = 6 },
+            Stroke = Color.FromArgb("#00000000"), StrokeThickness = 1,
+            BackgroundColor = Color.FromArgb("#00000000"),
             BindingContext = vm,
             Content = inner,
         };
@@ -574,7 +694,7 @@ public partial class MainPage : ContentPage
         border.GestureRecognizers.Add(drop);
 
         _slotViews[id] = border;
-        parent.Add(border);
+        PadOverlay.Add(border);
 
         vm.PropertyChanged += (_, _) => UpdateSlotVisual(id);
     }
@@ -584,21 +704,15 @@ public partial class MainPage : ContentPage
         var vm = _slots[id];
         var b = _slotViews[id];
         bool selected = _selectedSlot == id;
+        // Only the STROKE conveys selection/filled state; the BackgroundColor is
+        // owned by the per-slot panel light (ApplyLedToSlot), so we never touch
+        // it here or we'd clobber the glow.
         if (selected)
-        {
-            b.Stroke = Color.FromArgb("#f5c518");
-            b.BackgroundColor = Color.FromArgb("#26f5c518");
-        }
+            b.Stroke = new SolidColorBrush(Color.FromArgb("#f5c518"));
         else if (vm.Filled)
-        {
-            b.Stroke = Color.FromArgb("#f5c518");
-            b.BackgroundColor = Color.FromArgb("#0ff5c518");
-        }
+            b.Stroke = new SolidColorBrush(Color.FromArgb("#aaf5c518"));
         else
-        {
-            b.Stroke = Color.FromArgb("#3c3c4d");
-            b.BackgroundColor = Color.FromArgb("#59000000");
-        }
+            b.Stroke = new SolidColorBrush(Colors.Transparent);
     }
 
     // ---- interactions -------------------------------------------------------

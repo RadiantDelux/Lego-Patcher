@@ -41,42 +41,15 @@
 
                 <ScrollView x:Name="PadScroll">
                     <VerticalStackLayout Spacing="12">
-                        <Border StrokeShape="RoundRectangle 6"
-                                Stroke="#2c2c38" BackgroundColor="#181820" Padding="16">
-                            <Grid ColumnDefinitions="*,*,*" ColumnSpacing="10">
-                                <VerticalStackLayout Grid.Column="0" Spacing="8">
-                                    <Label Text="IZQUIERDA" TextColor="#8a8aa0"
-                                           FontSize="11" FontAttributes="Bold"
-                                           HorizontalOptions="Center" />
-                                    <Border x:Name="LedLeft" StrokeShape="RoundRectangle 10"
-                                            Stroke="#222230" StrokeThickness="2"
-                                            BackgroundColor="#14181820" Padding="6">
-                                        <VerticalStackLayout x:Name="ZoneL" Spacing="10" />
-                                    </Border>
-                                </VerticalStackLayout>
-                                <VerticalStackLayout Grid.Column="1" Spacing="8"
-                                                     VerticalOptions="Center">
-                                    <Label Text="CENTRO" TextColor="#f5c518"
-                                           FontSize="11" FontAttributes="Bold"
-                                           HorizontalOptions="Center" />
-                                    <Border x:Name="LedCenter" StrokeShape="RoundRectangle 10"
-                                            Stroke="#222230" StrokeThickness="2"
-                                            BackgroundColor="#14181820" Padding="6">
-                                        <VerticalStackLayout x:Name="ZoneC" Spacing="10" />
-                                    </Border>
-                                </VerticalStackLayout>
-                                <VerticalStackLayout Grid.Column="2" Spacing="8">
-                                    <Label Text="DERECHA" TextColor="#5ad6ff"
-                                           FontSize="11" FontAttributes="Bold"
-                                           HorizontalOptions="Center" />
-                                    <Border x:Name="LedRight" StrokeShape="RoundRectangle 10"
-                                            Stroke="#222230" StrokeThickness="2"
-                                            BackgroundColor="#14181820" Padding="6">
-                                        <VerticalStackLayout x:Name="ZoneR" Spacing="10" />
-                                    </Border>
-                                </VerticalStackLayout>
-                            </Grid>
-                        </Border>
+                        <!-- Toy Pad image with the three light zones overlaid.
+                             PadImageWrap is forced to the image's 4:3 aspect in
+                             code-behind; the zones are positioned proportionally
+                             in LayoutPadZones(). -->
+                        <Grid x:Name="PadImageWrap" HorizontalOptions="Center"
+                              VerticalOptions="Start" MaximumWidthRequest="680">
+                            <Image x:Name="PadImage" Aspect="Fill" />
+                            <AbsoluteLayout x:Name="PadOverlay" />
+                        </Grid>
 
                         <HorizontalStackLayout Spacing="8" HorizontalOptions="Center">
                             <Button Text="↻ Sincronizar" Clicked="OnSync" Style="{StaticResource Ghost}" />
