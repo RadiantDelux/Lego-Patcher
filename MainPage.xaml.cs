@@ -41,6 +41,196 @@ public partial class MainPage : ContentPage
             InstallButton.Text = AppSettings.IsPs4 ? "Instalar PS4" : "Instalar PS3";
     }
 
+    // ---- LED mirror ---------------------------------------------------------
+    // The plugin writes the pad's light colors to leds.txt; we poll it while
+    // connected and tint the three color bars (left / center / right).
+    IDispatcherTimer? _ledTimer;
+    bool _ledBusy;
+
+    void StartLedPolling()
+    {
+        if (_ledTimer is not null) return;
+        _ledTimer = Dispatcher.CreateTimer();
+        _ledTimer.Interval = TimeSpan.FromMilliseconds(1000);
+        _ledTimer.Tick += async (_, _) => await PollLedsAsync();
+        _ledTimer.Start();
+    }
+
+    void StopLedPolling()
+    {
+        _ledTimer?.Stop();
+        _ledTimer = null;
+        ResetLedBars();
+    }
+
+    void ResetLedBars()
+    {
+        var off = Color.FromArgb("#222230");
+        ApplyLedPanel(LedLeft, off, false);
+        ApplyLedPanel(LedCenter, off, false);
+        ApplyLedPanel(LedRight, off, false);
+    }
+
+    async Task PollLedsAsync()
+    {
+        if (_ledBusy || !_connected) return;
+        _ledBusy = true;
+        try
+        {
+            var colors = await _ps3.ReadLedsAsync();   // [center, left, right] or null
+            if (colors is null) return;
+            // file order is center, left, right
+            SetLedPanel(LedCenter, colors[0]);
+            SetLedPanel(LedLeft,   colors[1]);
+            SetLedPanel(LedRight,  colors[2]);
+        }
+        catch { /* transient FTP errors: keep last colors */ }
+        finally { _ledBusy = false; }
+    }
+
+    void SetLedPanel(Border? panel, string hex)
+    {
+        if (panel is null) return;
+        var c = ParseLed(hex);
+        bool on = !(c.Red == 0 && c.Green == 0 && c.Blue == 0);
+        ApplyLedPanel(panel, c, on);
+    }
+
+    // Tint the whole zone: bright stroke + a translucent fill of the same hue
+    // so the panel "glows" the LED color. Off = neutral dark. Transitions are
+    // animated so colors fade smoothly instead of snapping.
+    void ApplyLedPanel(Border? panel, Color c, bool on)
+    {
+        if (panel is null) return;
+        Color targetStroke, targetFill;
+        if (on)
+        {
+            targetStroke = c;
+            targetFill = new Color(c.Red, c.Green, c.Blue, 0.22f);
+        }
+        else
+        {
+            targetStroke = Color.FromArgb("#222230");
+            targetFill = Color.FromArgb("#14181820");
+        }
+        AnimateLedPanel(panel, targetStroke, targetFill);
+    }
+
+    // Smoothly cross-fade a panel's stroke + background to the target colors
+    // over ~450ms. Cancels any in-flight fade on that panel first.
+    void AnimateLedPanel(Border panel, Color toStroke, Color toFill)
+    {
+        const uint ms = 450;
+        string name = "ledfade";
+
+        var fromStroke = (panel.Stroke as SolidColorBrush)?.Color
+                         ?? Color.FromArgb("#222230");
+        var fromFill = panel.BackgroundColor ?? Color.FromArgb("#14181820");
+
+        // already at target? skip.
+        if (ColorsClose(fromStroke, toStroke) && ColorsClose(fromFill, toFill))
+            return;
+
+        panel.AbortAnimation(name);
+        var anim = new Animation(t =>
+        {
+            float f = (float)t;
+            panel.Stroke = Lerp(fromStroke, toStroke, f);
+            panel.BackgroundColor = Lerp(fromFill, toFill, f);
+        }, 0, 1, Easing.CubicInOut);
+        anim.Commit(panel, name, length: ms);
+    }
+
+    static bool ColorsClose(Color a, Color b)
+    {
+        return Math.Abs(a.Red - b.Red) < 0.004 && Math.Abs(a.Green - b.Green) < 0.004
+            && Math.Abs(a.Blue - b.Blue) < 0.004 && Math.Abs(a.Alpha - b.Alpha) < 0.004;
+    }
+
+    static Color Lerp(Color a, Color b, float t)
+    {
+        return new Color(
+            a.Red   + (b.Red   - a.Red)   * t,
+            a.Green + (b.Green - a.Green) * t,
+            a.Blue  + (b.Blue  - a.Blue)  * t,
+            a.Alpha + (b.Alpha - a.Alpha) * t);
+    }
+
+    static Color ParseLed(string hex)
+    {
+        try
+        {
+            return MapToypadColor(hex.TrimStart('#').ToLowerInvariant());
+        }
+        catch { return Color.FromArgb("#000000"); }
+    }
+
+    // The game drives the pad with "raw" values that the real Toy Pad shows as
+    // much brighter/saturated colors. There is no official formula (node-ld's
+    // table is empirical and incomplete), but the behavior is consistent:
+    //   - a single dominant channel -> that color at full brightness
+    //   - "amber" (R high, G ~half of R, B low) -> white  (this is how the pad
+    //     produces white; e.g. idle 99420e and 7f360b both -> white)
+    // So: try the known exact table first, else amber->white, else normalize
+    // to the brightest channel (saturate + brighten).
+    static Color MapToypadColor(string raw)
+    {
+        if (raw.Length != 6) return Color.FromArgb("#000000");
+        int r = Convert.ToInt32(raw.Substring(0, 2), 16);
+        int g = Convert.ToInt32(raw.Substring(2, 2), 16);
+        int b = Convert.ToInt32(raw.Substring(4, 2), 16);
+
+        // exact table (node-ld / Berny23) for the special keystone hues
+        if (ExactColor.TryGetValue(raw, out var exact))
+            return Color.FromArgb("#" + exact);
+
+        int max = Math.Max(r, Math.Max(g, b));
+        if (max == 0) return Color.FromArgb("#000000"); // truly off
+
+        // amber detection -> white: R is the brightest, green is roughly a
+        // third to two-thirds of red, blue is small.
+        if (r == max && r > 0 && g >= r * 0.30 && g <= r * 0.62 && b <= r * 0.30)
+            return Color.FromArgb("#ffffff");
+
+        // otherwise saturate/brighten: scale all channels so the brightest
+        // becomes 255, preserving the hue the game intended.
+        int nr = Math.Min(255, r * 255 / max);
+        int ng = Math.Min(255, g * 255 / max);
+        int nb = Math.Min(255, b * 255 / max);
+        return Color.FromRgb(nr, ng, nb);
+    }
+
+    // Special-case raw->shown colors from node-ld (keystones, scanners, idle).
+    static readonly Dictionary<string, string> ExactColor = new()
+    {
+        ["99420e"] = "ffffff", // idle (full white)
+        ["ff6e00"] = "ffff00", // yellow
+        ["006e00"] = "00ff00", // green
+        ["006e18"] = "00ffff", // cyan
+        ["000018"] = "0000ff", // blue
+        ["ff0018"] = "ff00ff", // pink
+        ["f00016"] = "ff2de6", // wyldstyle scanner
+        ["002007"] = "007575", // shift keystone
+        ["4c2000"] = "757500",
+        ["4c0007"] = "750075",
+        ["3f1b05"] = "b0b0b0", // chroma keystone
+        ["4c2007"] = "757575",
+        ["3f1b00"] = "b0b000",
+        ["3f0000"] = "b00000",
+        ["000005"] = "0000b0",
+        ["001b00"] = "00b000",
+        ["ff2700"] = "ffa200",
+        ["3f0900"] = "b06f00",
+        ["44000d"] = "d500ff",
+        ["110003"] = "9300b0",
+        ["000016"] = "0000ff", // element keystone (blue)
+        ["006700"] = "00ff00", // element keystone (green)
+        ["ff1e00"] = "ffa200", // scale keystone
+        ["f06716"] = "ffffff",
+        ["003700"] = "00ff00", // hack minigame green
+        ["ff6e18"] = "ffffff",
+    };
+
     async void OnTogglePlatform(object? sender, EventArgs e)
     {
         // simple toggle PS3 <-> PS4; lets the user switch without re-running
@@ -228,15 +418,53 @@ public partial class MainPage : ContentPage
         }
         else
         {
-            bool conn = await DisplayAlert("Conectar a la PS3",
+            await ChooseConsoleAndConnectAsync();
+        }
+    }
+
+    // First-run / manual: pick the target console, show that console's setup
+    // instructions, then offer to connect. The platform toggle in the toolbar
+    // stays in sync. (Connect itself no longer asks for the console.)
+    async Task ChooseConsoleAndConnectAsync()
+    {
+        string choice = await DisplayActionSheet("¿Para qué consola?", "Cancelar", null,
+            "PS3 (webMAN / multiMAN)", "PS4 (GoldHEN)");
+        if (choice is null || choice == "Cancelar") return;
+
+        bool ps4 = choice.StartsWith("PS4");
+        AppSettings.Platform = ps4 ? "ps4" : "ps3";
+        AppSettings.FtpPort = 0;            // platform default (PS3=21, PS4=2121)
+        RefreshPlatformUi();
+        SetConnected(false);
+
+        string title, body;
+        if (ps4)
+        {
+            title = "Conectar a la PS4 (GoldHEN)";
+            body =
+                "Para colocar figuras la app se conecta a tu PS4 por FTP (GoldHEN).\n\n" +
+                "Necesitas:\n" +
+                "• PS4 con GoldHEN y el Plugin Loader activo.\n" +
+                "• El servidor FTP de GoldHEN encendido (puerto 2121).\n" +
+                "• La IP local de la consola (Ajustes → Red → Ver estado de la conexión).\n\n" +
+                "Luego pulsa Instalar PS4 para subir el plugin y registrarlo en " +
+                "plugins.ini. Las figuras van a /data/toypad_emu/.\n\n" +
+                "¿Quieres configurar la conexión ahora?";
+        }
+        else
+        {
+            title = "Conectar a la PS3";
+            body =
                 "Para colocar figuras la app se conecta a tu PS3 por FTP (webMAN MOD).\n\n" +
                 "Necesitas:\n" +
                 "• PS3 con jailbreak (HEN/CFW) y webMAN MOD con FTP activo.\n" +
                 "• La IP local de la consola (la ves en webMAN o en ajustes de red).\n\n" +
-                "¿Quieres configurar la conexión ahora?",
-                "Conectar", "Más tarde");
-            if (conn) await ConnectFlowAsync();
+                "Luego pulsa Instalar PS3 para subir el plugin y el EBOOT parcheado.\n\n" +
+                "¿Quieres configurar la conexión ahora?";
         }
+
+        bool conn = await DisplayAlert(title, body, "Conectar", "Más tarde");
+        if (conn) await ConnectFlowAsync();
     }
 
     async Task LoadImagesAsync()
@@ -434,8 +662,11 @@ public partial class MainPage : ContentPage
             {
                 var srcFig = _lib.Figures.FirstOrDefault(x => x.RelPath == src.RelPath);
                 if (srcFig is null) { await Toast("Figura no encontrada"); return; }
-                await _ps3.PlaceAsync(dstSlot, _lib.ReadBytes(srcFig));
+                // Remove the source FIRST so the old and new figureN.bin never
+                // coexist with the same UID (that confused the pad's detection
+                // when moving a figure between panels).
                 await _ps3.RemoveAsync(srcSlot);
+                await _ps3.PlaceAsync(dstSlot, _lib.ReadBytes(srcFig));
                 dst.Set(src.Name, src.RelPath, src.Thumb);
                 src.Clear();
                 await Toast($"Movido {srcSlot} → {dstSlot}");
@@ -572,8 +803,10 @@ public partial class MainPage : ContentPage
                     // MOVE
                     var srcFig = _lib.Figures.FirstOrDefault(x => x.RelPath == src.RelPath);
                     if (srcFig is null) { await Toast("Figura no encontrada"); return; }
-                    await _ps3.PlaceAsync(dstSlot, _lib.ReadBytes(srcFig));
+                    // Remove source first (see note in MoveOrSwapAsync): avoids
+                    // the old/new .bin coexisting with the same UID.
                     await _ps3.RemoveAsync(srcSlot);
+                    await _ps3.PlaceAsync(dstSlot, _lib.ReadBytes(srcFig));
                     dst.Set(src.Name, src.RelPath, src.Thumb);
                     src.Clear();
                     await Toast($"Movido {srcSlot} → {dstSlot}");
@@ -822,13 +1055,9 @@ public partial class MainPage : ContentPage
 
     async Task ConnectFlowAsync()
     {
-        // 0. choose target platform
-        string plat = await DisplayActionSheet("¿Qué consola?", "Cancelar", null,
-            "PS3 (webMAN / multiMAN)", "PS4 (GoldHEN)");
-        if (plat is null || plat == "Cancelar") return;
-        bool ps4 = plat.StartsWith("PS4");
-        AppSettings.Platform = ps4 ? "ps4" : "ps3";
-        AppSettings.FtpPort = 0; // use platform default (PS3=21, PS4=2121)
+        // Platform is chosen by the toolbar toggle / first-run console picker,
+        // not here. Just connect to the currently selected console.
+        bool ps4 = AppSettings.IsPs4;
 
         string label = ps4 ? "Conectar a la PS4" : "Conectar a la PS3";
         string ipHint = ps4
@@ -986,6 +1215,8 @@ public partial class MainPage : ContentPage
             : (string.IsNullOrWhiteSpace(AppSettings.Host) ? "sin conexión" : "desconectado");
         if (InstallButton is not null)
             InstallButton.Text = AppSettings.IsPs4 ? "Instalar PS4" : "Instalar PS3";
+        if (ok) StartLedPolling();
+        else StopLedPolling();
     }
 
     Task Toast(string msg) => DisplayAlertShort(msg);

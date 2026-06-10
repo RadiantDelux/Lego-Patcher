@@ -154,6 +154,45 @@ public class Ps3Service
         return result;
     }
 
+    // Path of the LED mirror file the plugin writes (center/left/right colors).
+    static string LedsPath => $"{FigureDir}/leds.txt";
+
+    // Reads the plugin's LED mirror. Returns 3 colors (center, left, right) as
+    // "#rrggbb" strings, or null if the file is absent/unreadable. The plugin
+    // writes "rrggbb rrggbb rrggbb\n" only when the game changes the lights.
+    public async Task<string[]?> ReadLedsAsync(CancellationToken ct = default)
+    {
+        await _lock.WaitAsync(ct);
+        try
+        {
+            await using var c = NewClient();
+            await c.Connect(ct);
+            if (!await c.FileExists(LedsPath, ct)) return null;
+            var bytes = await c.DownloadBytes(LedsPath, ct);
+            if (bytes is null || bytes.Length == 0) return null;
+
+            var text = System.Text.Encoding.ASCII.GetString(bytes).Trim();
+            var parts = text.Split(new[] { ' ', '\n', '\r', '\t' },
+                StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length < 3) return null;
+
+            var colors = new string[3];
+            for (int i = 0; i < 3; i++)
+            {
+                var hex = parts[i].Trim();
+                if (hex.Length != 6) return null;
+                // validate it's hex; bail if not
+                if (!int.TryParse(hex, System.Globalization.NumberStyles.HexNumber,
+                        null, out _))
+                    return null;
+                colors[i] = "#" + hex;
+            }
+            return colors;
+        }
+        catch { return null; }
+        finally { _lock.Release(); }
+    }
+
     public async Task InstallSprxAsync(byte[] sprx, IProgress<double>? prog = null,
         CancellationToken ct = default)
     {

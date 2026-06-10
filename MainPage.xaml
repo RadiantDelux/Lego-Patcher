@@ -48,20 +48,32 @@
                                     <Label Text="IZQUIERDA" TextColor="#8a8aa0"
                                            FontSize="11" FontAttributes="Bold"
                                            HorizontalOptions="Center" />
-                                    <VerticalStackLayout x:Name="ZoneL" Spacing="10" />
+                                    <Border x:Name="LedLeft" StrokeShape="RoundRectangle 10"
+                                            Stroke="#222230" StrokeThickness="2"
+                                            BackgroundColor="#14181820" Padding="6">
+                                        <VerticalStackLayout x:Name="ZoneL" Spacing="10" />
+                                    </Border>
                                 </VerticalStackLayout>
                                 <VerticalStackLayout Grid.Column="1" Spacing="8"
                                                      VerticalOptions="Center">
                                     <Label Text="CENTRO" TextColor="#f5c518"
                                            FontSize="11" FontAttributes="Bold"
                                            HorizontalOptions="Center" />
-                                    <VerticalStackLayout x:Name="ZoneC" Spacing="10" />
+                                    <Border x:Name="LedCenter" StrokeShape="RoundRectangle 10"
+                                            Stroke="#222230" StrokeThickness="2"
+                                            BackgroundColor="#14181820" Padding="6">
+                                        <VerticalStackLayout x:Name="ZoneC" Spacing="10" />
+                                    </Border>
                                 </VerticalStackLayout>
                                 <VerticalStackLayout Grid.Column="2" Spacing="8">
                                     <Label Text="DERECHA" TextColor="#5ad6ff"
                                            FontSize="11" FontAttributes="Bold"
                                            HorizontalOptions="Center" />
-                                    <VerticalStackLayout x:Name="ZoneR" Spacing="10" />
+                                    <Border x:Name="LedRight" StrokeShape="RoundRectangle 10"
+                                            Stroke="#222230" StrokeThickness="2"
+                                            BackgroundColor="#14181820" Padding="6">
+                                        <VerticalStackLayout x:Name="ZoneR" Spacing="10" />
+                                    </Border>
                                 </VerticalStackLayout>
                             </Grid>
                         </Border>
