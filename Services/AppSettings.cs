@@ -35,6 +35,26 @@ public static class AppSettings
         set => Preferences.Set(nameof(FtpPort), value);
     }
 
+    // UI language: "es" (Spanish) or "en" (English). Defaults to the device
+    // language if it's Spanish, else English.
+    public static string Language
+    {
+        get => Preferences.Get(nameof(Language), DefaultLanguage());
+        set => Preferences.Set(nameof(Language), value);
+    }
+
+    static string DefaultLanguage()
+    {
+        try
+        {
+            var two = System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName;
+            return two == "es" ? "es" : "en";
+        }
+        catch { return "en"; }
+    }
+
+    public static bool IsEnglish => string.Equals(Language, "en", StringComparison.OrdinalIgnoreCase);
+
     public static bool IsPs4 => string.Equals(Platform, "ps4", StringComparison.OrdinalIgnoreCase);
 
     public static bool DimensionsImported

@@ -1,4 +1,4 @@
-﻿using System.Globalization;
+using System.Globalization;
 using ToyPadMaui.Models;
 using ToyPadMaui.Services;
 using ToyPadMaui.ViewModels;
@@ -17,9 +17,8 @@ public partial class MainPage : ContentPage
     string _curQuery = "";
     bool _connected;
 
-    const string DefaultHint =
-        "Arrastra una figura a un espacio, o toca un espacio y luego una figura. " +
-        "Arrastra entre espacios para mover o intercambiar. Toca un espacio lleno para quitar.";
+    const string DefaultHintFallback = "";
+    string DefaultHint => Loc.T("hint.default");
 
     public MainPage(Ps3Service ps3, FigureLibrary lib)
     {
@@ -30,17 +29,46 @@ public partial class MainPage : ContentPage
         BuildSlots();
         SizeChanged += OnPageSizeChanged;
         PadImageWrap.SizeChanged += OnPadWrapSizeChanged;
+        ApplyLanguage();
         RefreshPlatformUi();
         _ = InitAsync();
+    }
+
+    // ---- localization -------------------------------------------------------
+    void OnToggleLanguage(object? sender, EventArgs e)
+    {
+        AppSettings.Language = AppSettings.IsEnglish ? "es" : "en";
+        ApplyLanguage();
+        RefreshPlatformUi();
+        SetConnected(_connected);
+    }
+
+    // Push all static UI strings from Loc for the current language.
+    void ApplyLanguage()
+    {
+        AboutBtn.Text   = Loc.T("btn.about");
+        ImportBtn.Text  = Loc.T("btn.import");
+        ConnectBtn.Text = Loc.T("btn.connect");
+        CreditsBtn.Text = Loc.T("btn.credits");
+        LangBtn.Text    = Loc.T("btn.lang");
+        SyncBtn.Text    = Loc.T("btn.sync");
+        ClearBtn.Text   = Loc.T("btn.clearall");
+        FabFiguras.Text = Loc.T("btn.figs");
+        CatAll.Text     = Loc.T("cat.all");
+        CatChar.Text    = Loc.T("cat.char");
+        CatVeh.Text     = Loc.T("cat.veh");
+        CatGad.Text     = Loc.T("cat.gad");
+        SearchBox.Placeholder = Loc.T("search.placeholder");
+        if (HintLabel is not null) HintLabel.Text = DefaultHint;
     }
 
     // Reflect the current platform on the toolbar button + install button.
     void RefreshPlatformUi()
     {
         if (PlatformButton is not null)
-            PlatformButton.Text = AppSettings.IsPs4 ? "Modo: PS4" : "Modo: PS3";
+            PlatformButton.Text = Loc.T(AppSettings.IsPs4 ? "btn.mode.ps4" : "btn.mode.ps3");
         if (InstallButton is not null)
-            InstallButton.Text = AppSettings.IsPs4 ? "Instalar PS4" : "Instalar PS3";
+            InstallButton.Text = Loc.T(AppSettings.IsPs4 ? "btn.install.ps4" : "btn.install.ps3");
     }
 
     // ---- LED mirror ---------------------------------------------------------
@@ -186,15 +214,15 @@ public partial class MainPage : ContentPage
     {
         // simple toggle PS3 <-> PS4; lets the user switch without re-running
         // the connect flow.
-        string choice = await DisplayActionSheet("Plataforma destino", "Cancelar", null,
-            "PS3 (webMAN / multiMAN)", "PS4 (GoldHEN)");
-        if (choice is null || choice == "Cancelar") return;
+        string choice = await DisplayActionSheet(Loc.T("platform.title"), Loc.T("cancel"), null,
+            Loc.T("console.ps3"), Loc.T("console.ps4"));
+        if (choice is null || choice == Loc.T("cancel")) return;
         bool ps4 = choice.StartsWith("PS4");
         AppSettings.Platform = ps4 ? "ps4" : "ps3";
         AppSettings.FtpPort = 0; // use platform default (PS3=21, PS4=2121)
         RefreshPlatformUi();
         SetConnected(false);
-        await Toast(ps4 ? "Modo PS4 (FTP 2121)" : "Modo PS3 (FTP 21)");
+        await Toast(Loc.T(ps4 ? "toast.mode.ps4" : "toast.mode.ps3"));
     }
 
     bool _isWide = true;
@@ -342,23 +370,10 @@ public partial class MainPage : ContentPage
 
         if (!_lib.HasFigures)
         {
-            string extra = "";
-            if (DeviceInfo.Platform == DevicePlatform.iOS)
-                extra = "\n\nNOTA iOS: si el selector de archivos no te deja " +
-                        "elegir el zip (bug de iOS), descomprímelo y copia las " +
-                        "carpetas Characters, Vehicles y Gadgets dentro de " +
-                        "Archivos → En mi iPhone → LEGOPATCHER → Dimensions. " +
-                        "También puedes abrir el zip desde Archivos y elegir " +
-                        "Compartir → LEGOPATCHER.";
-
-            bool pick = await DisplayAlert("Importar figuras (.zip)",
-                "Para colocar figuras necesitas un archivo .zip con los volcados NFC (.bin) " +
-                "organizados en carpetas Characters, Vehicles y Gadgets.\n\n" +
-                "Por motivos legales estos archivos NO se incluyen en la app: son contenido " +
-                "del juego y cada quien debe aportar los suyos. Se guardan solo en este " +
-                "dispositivo, nunca se suben a ningún servidor." + extra + "\n\n" +
-                "¿Quieres seleccionar tu Dimensions.zip ahora?",
-                "Seleccionar zip", "Más tarde");
+            string extra = DeviceInfo.Platform == DevicePlatform.iOS ? Loc.T("import.ios") : "";
+            bool pick = await DisplayAlert(Loc.T("import.title"),
+                Loc.T("import.body", extra),
+                Loc.T("import.pick"), Loc.T("later"));
             if (pick) await ImportFlowAsync();
         }
 
@@ -378,9 +393,9 @@ public partial class MainPage : ContentPage
     // stays in sync. (Connect itself no longer asks for the console.)
     async Task ChooseConsoleAndConnectAsync()
     {
-        string choice = await DisplayActionSheet("¿Para qué consola?", "Cancelar", null,
-            "PS3 (webMAN / multiMAN)", "PS4 (GoldHEN)");
-        if (choice is null || choice == "Cancelar") return;
+        string choice = await DisplayActionSheet(Loc.T("console.which"), Loc.T("cancel"), null,
+            Loc.T("console.ps3"), Loc.T("console.ps4"));
+        if (choice is null || choice == Loc.T("cancel")) return;
 
         bool ps4 = choice.StartsWith("PS4");
         AppSettings.Platform = ps4 ? "ps4" : "ps3";
@@ -388,33 +403,9 @@ public partial class MainPage : ContentPage
         RefreshPlatformUi();
         SetConnected(false);
 
-        string title, body;
-        if (ps4)
-        {
-            title = "Conectar a la PS4 (GoldHEN)";
-            body =
-                "Para colocar figuras la app se conecta a tu PS4 por FTP (GoldHEN).\n\n" +
-                "Necesitas:\n" +
-                "• PS4 con GoldHEN y el Plugin Loader activo.\n" +
-                "• El servidor FTP de GoldHEN encendido (puerto 2121).\n" +
-                "• La IP local de la consola (Ajustes → Red → Ver estado de la conexión).\n\n" +
-                "Luego pulsa Instalar PS4 para subir el plugin y registrarlo en " +
-                "plugins.ini. Las figuras van a /data/toypad_emu/.\n\n" +
-                "¿Quieres configurar la conexión ahora?";
-        }
-        else
-        {
-            title = "Conectar a la PS3";
-            body =
-                "Para colocar figuras la app se conecta a tu PS3 por FTP (webMAN MOD).\n\n" +
-                "Necesitas:\n" +
-                "• PS3 con jailbreak (HEN/CFW) y webMAN MOD con FTP activo.\n" +
-                "• La IP local de la consola (la ves en webMAN o en ajustes de red).\n\n" +
-                "Luego pulsa Instalar PS3 para subir el plugin y el EBOOT parcheado.\n\n" +
-                "¿Quieres configurar la conexión ahora?";
-        }
-
-        bool conn = await DisplayAlert(title, body, "Conectar", "Más tarde");
+        string title = Loc.T(ps4 ? "connect.ps4.title" : "connect.ps3.title");
+        string body  = Loc.T(ps4 ? "connect.ps4.body"  : "connect.ps3.body");
+        bool conn = await DisplayAlert(title, body, Loc.T("connect"), Loc.T("later"));
         if (conn) await ConnectFlowAsync();
     }
 
@@ -762,7 +753,7 @@ public partial class MainPage : ContentPage
                 var dstFig = _lib.Figures.FirstOrDefault(x => x.RelPath == dst.RelPath);
                 if (srcFig is null || dstFig is null)
                 {
-                    await Toast("No puedo intercambiar (figura no encontrada)");
+                    await Toast(Loc.T("swap.fail"));
                     return;
                 }
                 await _ps3.PlaceAsync(dstSlot, _lib.ReadBytes(srcFig));
@@ -770,12 +761,12 @@ public partial class MainPage : ContentPage
                 var sN = src.Name; var sP = src.RelPath; var sT = src.Thumb;
                 src.Set(dst.Name, dst.RelPath, dst.Thumb);
                 dst.Set(sN, sP, sT);
-                await Toast($"Intercambio {srcSlot} ↔ {dstSlot}");
+                await Toast(Loc.T("swapped", srcSlot, dstSlot));
             }
             else
             {
                 var srcFig = _lib.Figures.FirstOrDefault(x => x.RelPath == src.RelPath);
-                if (srcFig is null) { await Toast("Figura no encontrada"); return; }
+                if (srcFig is null) { await Toast(Loc.T("fig.notfound")); return; }
                 // Remove the source FIRST so the old and new figureN.bin never
                 // coexist with the same UID (that confused the pad's detection
                 // when moving a figure between panels).
@@ -783,10 +774,10 @@ public partial class MainPage : ContentPage
                 await _ps3.PlaceAsync(dstSlot, _lib.ReadBytes(srcFig));
                 dst.Set(src.Name, src.RelPath, src.Thumb);
                 src.Clear();
-                await Toast($"Movido {srcSlot} → {dstSlot}");
+                await Toast(Loc.T("moved", srcSlot, dstSlot));
             }
         }
-        catch (Exception ex) { await Toast($"Error: {ex.Message}"); }
+        catch (Exception ex) { await Toast(Loc.T("err.fmt", ex.Message)); }
     }
 
     async Task RemoveSlotAsync(string id)
@@ -800,9 +791,9 @@ public partial class MainPage : ContentPage
             vm.Clear();
             if (_selectedSlot == id) _selectedSlot = null;
             RefreshAllSlotVisuals();
-            await Toast($"Quitada de {id}");
+            await Toast(Loc.T("removed", id));
         }
-        catch (Exception ex) { await Toast($"Error: {ex.Message}"); }
+        catch (Exception ex) { await Toast(Loc.T("err.fmt", ex.Message)); }
     }
 
     void RefreshAllSlotVisuals()
@@ -814,7 +805,7 @@ public partial class MainPage : ContentPage
     {
         if (_selectedSlot is null)
         {
-            await Toast("Primero toca un espacio del Toy Pad");
+            await Toast(Loc.T("slot.firstTapEmpty"));
             return;
         }
 
@@ -843,7 +834,7 @@ public partial class MainPage : ContentPage
         {
             var bytes = _lib.ReadBytes(f);
             await _ps3.PlaceAsync(slot, bytes);
-            await Toast($"{f.Name} → {slot}");
+            await Toast(Loc.T("placed", f.Name, slot));
         }
         catch (Exception ex)
         {
@@ -859,8 +850,8 @@ public partial class MainPage : ContentPage
                 detail += $"\n→ {inner.GetType().Name}: {inner.Message}";
                 inner = inner.InnerException;
             }
-            await DisplayAlert("Error al colocar figura",
-                $"{ex.GetType().Name}: {detail}", "OK");
+            await DisplayAlert(Loc.T("err.place.title"),
+                $"{ex.GetType().Name}: {detail}", Loc.T("ok"));
         }
     }
 
@@ -885,7 +876,7 @@ public partial class MainPage : ContentPage
                 _slots[dstSlot].Set(f.Name, f.RelPath, f.ThumbFile);
                 _selectedSlot = null;
                 RefreshAllSlotVisuals();
-                await Toast($"{f.Name} → {dstSlot}");
+                await Toast(Loc.T("placed", f.Name, dstSlot));
             }
             else if (kind == "slot")
             {
@@ -902,7 +893,7 @@ public partial class MainPage : ContentPage
                     var dstFig = _lib.Figures.FirstOrDefault(x => x.RelPath == dst.RelPath);
                     if (srcFig is null || dstFig is null)
                     {
-                        await Toast("No puedo intercambiar (figura no encontrada)");
+                        await Toast(Loc.T("swap.fail"));
                         return;
                     }
                     await _ps3.PlaceAsync(dstSlot, _lib.ReadBytes(srcFig));
@@ -910,20 +901,20 @@ public partial class MainPage : ContentPage
                     var sName = src.Name; var sPath = src.RelPath; var sThumb = src.Thumb;
                     src.Set(dst.Name, dst.RelPath, dst.Thumb);
                     dst.Set(sName, sPath, sThumb);
-                    await Toast($"Intercambio {srcSlot} ↔ {dstSlot}");
+                    await Toast(Loc.T("swapped", srcSlot, dstSlot));
                 }
                 else
                 {
                     // MOVE
                     var srcFig = _lib.Figures.FirstOrDefault(x => x.RelPath == src.RelPath);
-                    if (srcFig is null) { await Toast("Figura no encontrada"); return; }
+                    if (srcFig is null) { await Toast(Loc.T("fig.notfound")); return; }
                     // Remove source first (see note in MoveOrSwapAsync): avoids
                     // the old/new .bin coexisting with the same UID.
                     await _ps3.RemoveAsync(srcSlot);
                     await _ps3.PlaceAsync(dstSlot, _lib.ReadBytes(srcFig));
                     dst.Set(src.Name, src.RelPath, src.Thumb);
                     src.Clear();
-                    await Toast($"Movido {srcSlot} → {dstSlot}");
+                    await Toast(Loc.T("moved", srcSlot, dstSlot));
                 }
                 _selectedSlot = null;
                 RefreshAllSlotVisuals();
@@ -931,7 +922,7 @@ public partial class MainPage : ContentPage
         }
         catch (Exception ex)
         {
-            await DisplayAlert("Error", $"{ex.GetType().Name}: {ex.Message}", "OK");
+            await DisplayAlert(Loc.T("error"), $"{ex.GetType().Name}: {ex.Message}", Loc.T("ok"));
         }
     }
 
@@ -1025,13 +1016,13 @@ public partial class MainPage : ContentPage
             }
             RefreshAllSlotVisuals();
         }
-        catch (Exception ex) { await Toast($"Error: {ex.Message}"); }
+        catch (Exception ex) { await Toast(Loc.T("err.fmt", ex.Message)); }
     }
 
     async void OnClear(object? sender, EventArgs e)
     {
         if (!await EnsureConnectedAsync()) return;
-        bool ok = await DisplayAlert("Limpiar todo", "¿Quitar las 7 figuras del Toy Pad?", "Sí", "No");
+        bool ok = await DisplayAlert(Loc.T("clear.title"), Loc.T("clear.body"), Loc.T("yes"), Loc.T("no"));
         if (!ok) return;
         try
         {
@@ -1039,9 +1030,9 @@ public partial class MainPage : ContentPage
             foreach (var vm in _slots.Values) vm.Clear();
             _selectedSlot = null;
             RefreshAllSlotVisuals();
-            await Toast("Limpio");
+            await Toast(Loc.T("clear.done"));
         }
-        catch (Exception ex) { await Toast($"Error: {ex.Message}"); }
+        catch (Exception ex) { await Toast(Loc.T("err.fmt", ex.Message)); }
     }
 
     async void OnConnect(object? sender, EventArgs e) => await ConnectFlowAsync();
@@ -1057,112 +1048,66 @@ public partial class MainPage : ContentPage
             return;
         }
 
-        bool go = await DisplayAlert("Instalar en la PS3",
-            "Se subirá el plugin (toypad_emu.sprx) y se reemplazará el EBOOT.BIN del juego " +
-            "por el parcheado (se hace un respaldo del original). ¿Continuar?",
-            "Instalar", "Cancelar");
+        bool go = await DisplayAlert(Loc.T("install.ps3.title"),
+            Loc.T("install.ps3.body"), Loc.T("install"), Loc.T("cancel"));
         if (!go) return;
 
         try
         {
-            HintLabel.Text = "Subiendo plugin...";
+            HintLabel.Text = Loc.T("install.ps3.uploadSprx");
             var sprx = await FigureLibrary.ReadAssetAsync("toypad_emu.sprx");
             await _ps3.InstallSprxAsync(sprx);
 
-            HintLabel.Text = "Subiendo EBOOT.BIN (38 MB, tarda)...";
+            HintLabel.Text = Loc.T("install.ps3.uploadEboot");
             var eboot = await FigureLibrary.ReadAssetAsync("EBOOT.BIN");
             await _ps3.InstallEbootAsync(eboot);
 
-            await DisplayAlert("Listo",
-                "Instalación completada. Reinicia el juego desde el XMB para cargar el plugin.", "OK");
+            await DisplayAlert(Loc.T("done"), Loc.T("install.ps3.done"), Loc.T("ok"));
             HintLabel.Text = DefaultHint;
         }
         catch (Exception ex)
         {
             HintLabel.Text = DefaultHint;
-            await DisplayAlert("Error", ex.Message, "OK");
+            await DisplayAlert(Loc.T("error"), ex.Message, Loc.T("ok"));
         }
     }
 
     async Task InstallPs4FlowAsync()
     {
-        bool go = await DisplayAlert("Instalar en la PS4 (GoldHEN)",
-            "Se subirá el plugin (toypad_emu.prx) a /data/GoldHEN/plugins/, se " +
-            "registrará en plugins.ini para CUSA00935, y se creará /data/toypad_emu/. " +
-            "Requiere GoldHEN con Plugin Loader y su FTP (2121) encendidos. ¿Continuar?",
-            "Instalar", "Cancelar");
+        bool go = await DisplayAlert(Loc.T("install.ps4.title"),
+            Loc.T("install.ps4.body"), Loc.T("install"), Loc.T("cancel"));
         if (!go) return;
 
         try
         {
-            HintLabel.Text = "Subiendo plugin .prx a GoldHEN...";
+            HintLabel.Text = Loc.T("install.ps4.uploading");
             var prx = await FigureLibrary.ReadAssetAsync("toypad_emu.prx");
             await _ps3.InstallPs4Async(prx);
 
-            await DisplayAlert("Listo",
-                "Plugin instalado y registrado. Reinicia el juego para que GoldHEN " +
-                "lo cargue. Las figuras van a /data/toypad_emu/.", "OK");
+            await DisplayAlert(Loc.T("done"), Loc.T("install.ps4.done"), Loc.T("ok"));
             HintLabel.Text = DefaultHint;
         }
         catch (Exception ex)
         {
             HintLabel.Text = DefaultHint;
-            await DisplayAlert("Error", ex.Message, "OK");
+            await DisplayAlert(Loc.T("error"), ex.Message, Loc.T("ok"));
         }
     }
 
     async void OnAbout(object? sender, EventArgs e)
     {
-        await DisplayAlert("¿Qué es esto?",
-            "Un emulador por software del Toy Pad de LEGO Dimensions para PS3. " +
-            "Pones figuras, vehículos y gadgets en el juego sin el portal físico ni las figuras reales.\n\n" +
-            "CÓMO INSTALAR\n" +
-            "1. Enciende la PS3 y activa el FTP en webMAN.\n" +
-            "2. Toca Conectar y escribe la IP local de tu PS3. Prueba la conexión.\n" +
-            "3. Toca Instalar PS3 y espera a que termine.\n" +
-            "4. Abre el juego y pon las figuras cuando quieras.\n\n" +
-            "REQUISITOS\n" +
-            "PS3 con jailbreak (HEN/CFW) + webMAN MOD, juego en formato carpeta o ISO, " +
-            "versión 1.22, edición americana (BLUS31473).",
-            "Ver preguntas frecuentes");
-
+        await DisplayAlert(Loc.T("about.title"), Loc.T("about.body"), Loc.T("about.faqbtn"));
         await OnFaq();
     }
 
     async Task OnFaq()
     {
-        await DisplayAlert("Preguntas frecuentes",
-            "¿Necesito el portal o las figuras físicas?\n" +
-            "No. Reemplaza el hardware por completo.\n\n" +
-            "¿De dónde salen los archivos de las figuras?\n" +
-            "Tú los aportas (un .zip con los volcados .bin). Por motivos legales no se " +
-            "distribuyen; se guardan solo en este dispositivo.\n\n" +
-            "¿Sirve en cualquier PS3?\n" +
-            "Solo con jailbreak (HEN/CFW) y webMAN MOD. Por ahora únicamente la edición " +
-            "americana (BLUS31473), versión 1.22.\n\n" +
-            "¿Por qué los vehículos y gadgets salen en blanco?\n" +
-            "Es normal. El juego los muestra genéricos hasta su primera construcción dentro " +
-            "del juego, igual que con las figuras reales.\n\n" +
-            "¿Por qué importan los 7 espacios?\n" +
-            "El Toy Pad tiene 1 espacio central, 3 a la izquierda y 3 a la derecha. El juego " +
-            "los usa de forma específica, así que izquierda y derecha no son intercambiables.\n\n" +
-            "¿Es seguro? ¿Toca mi juego?\n" +
-            "Reemplaza el ejecutable del juego por uno modificado, pero hace un respaldo del " +
-            "original primero (EBOOT.BIN.original). Puedes revertirlo restaurándolo.",
-            "Cerrar");
+        await DisplayAlert(Loc.T("faq.title"), Loc.T("faq.body"), Loc.T("close"));
     }
 
     async void OnCredits(object? sender, EventArgs e)
     {
-        await DisplayAlert("Créditos",
-            "Desarrollo: RadiantDelux — plugin, parche del EBOOT, protocolo e interfaz.\n\n" +
-            "Protocolo: basado en node-ld / ToyPadEmu.\n\n" +
-            "Herramientas: TrueAncestor SELF Resigner, scetool (naehrwert/flatz), " +
-            "SPRXPatcher (modificado), Cell SDK PPU, webMAN MOD / HEN.\n\n" +
-            "Imágenes: LEGO Dimensions Wiki (Fandom). Los retratos son los mugshots oficiales de LEGO.com.\n" +
-            "LEGO y LEGO Dimensions son marcas de The LEGO Group. Proyecto no afiliado, sin fines de lucro.\n\n" +
-            "Los archivos .bin no se distribuyen; cada usuario importa los suyos y se guardan solo en este dispositivo.",
-            "Cerrar");
+        await DisplayAlert(Loc.T("credits.title"), Loc.T("credits.body"), Loc.T("close"));
     }
 
     // ---- flows --------------------------------------------------------------
@@ -1173,10 +1118,8 @@ public partial class MainPage : ContentPage
         // not here. Just connect to the currently selected console.
         bool ps4 = AppSettings.IsPs4;
 
-        string label = ps4 ? "Conectar a la PS4" : "Conectar a la PS3";
-        string ipHint = ps4
-            ? "IP local de la PS4 (Ajustes > Red). FTP de GoldHEN en :2121:"
-            : "IP local de la PS3 (la ves en webMAN o ajustes de red):";
+        string label = Loc.T(ps4 ? "connect.ps4.label" : "connect.ps3.label");
+        string ipHint = Loc.T(ps4 ? "connect.ip.ps4" : "connect.ip.ps3");
 
         string host = await DisplayPromptAsync(label, ipHint,
             initialValue: AppSettings.Host, placeholder: "192.168.1.10",
@@ -1186,21 +1129,21 @@ public partial class MainPage : ContentPage
         if (host.Length == 0) return;
 
         string user = await DisplayPromptAsync(label,
-            "Usuario FTP:", initialValue: string.IsNullOrEmpty(AppSettings.User) ? "anonymous" : AppSettings.User);
+            Loc.T("connect.user"), initialValue: string.IsNullOrEmpty(AppSettings.User) ? "anonymous" : AppSettings.User);
         if (user is null) user = "anonymous";
 
         string pass = await DisplayPromptAsync(label,
-            "Contraseña FTP (vacío suele bastar):", initialValue: AppSettings.Pass);
+            Loc.T("connect.pass"), initialValue: AppSettings.Pass);
         pass ??= "";
 
         AppSettings.Host = host;
         AppSettings.User = string.IsNullOrWhiteSpace(user) ? "anonymous" : user.Trim();
         AppSettings.Pass = pass;
 
-        await Toast("Probando conexión...");
+        await Toast(Loc.T("connect.testing"));
         bool ok = await _ps3.TestAsync();
         SetConnected(ok);
-        await Toast(ok ? $"Conectado a {host} ({(ps4 ? "PS4" : "PS3")})" : "No se pudo conectar");
+        await Toast(ok ? Loc.T("connect.ok", host, ps4 ? "PS4" : "PS3") : Loc.T("connect.fail"));
         if (ok) await SyncAsync();
     }
 
@@ -1211,15 +1154,15 @@ public partial class MainPage : ContentPage
         {
             try
             {
-                await Toast("Importando...");
+                await Toast(Loc.T("import.importing"));
                 using var ms = new MemoryStream(bytes);
                 int n = await _lib.ImportZipAsync(ms);
                 RenderLibrary();
-                await DisplayAlert("Importado", $"Importadas {n} figuras.", "OK");
+                await DisplayAlert(Loc.T("import.done.title"), Loc.T("import.done.body", n), Loc.T("ok"));
             }
             catch (Exception ex)
             {
-                await DisplayAlert("Error al importar", ex.Message, "OK");
+                await DisplayAlert(Loc.T("import.err.title"), ex.Message, Loc.T("ok"));
             }
         });
     }
@@ -1252,7 +1195,7 @@ public partial class MainPage : ContentPage
             if (DeviceInfo.Platform == DevicePlatform.iOS
                 || DeviceInfo.Platform == DevicePlatform.macOS)
             {
-                options = new PickOptions { PickerTitle = "Selecciona tu Dimensions.zip" };
+                options = new PickOptions { PickerTitle = Loc.T("import.pick") };
             }
             else
             {
@@ -1275,19 +1218,12 @@ public partial class MainPage : ContentPage
                 // manual route via the Files app.
                 if (DeviceInfo.Platform == DevicePlatform.iOS)
                 {
-                    await DisplayAlert("¿No puedes seleccionar el zip?",
-                        "Es un bug de iOS con el selector de archivos. Alternativas:\n\n" +
-                        "1) Abre el zip desde la app Archivos y elige " +
-                        "Compartir → LEGOPATCHER.\n\n" +
-                        "2) Descomprime el zip y copia las carpetas Characters, " +
-                        "Vehicles y Gadgets dentro de Archivos → En mi iPhone → " +
-                        "LEGOPATCHER → Dimensions.",
-                        "Entendido");
+                    await DisplayAlert(Loc.T("import.ios.title"), Loc.T("import.ios.body"), Loc.T("ok"));
                 }
                 return;
             }
 
-            await Toast("Importando...");
+            await Toast(Loc.T("import.importing"));
 
             // Read via the SAF/stream API (avoids needing the raw file path).
             using var ms = new MemoryStream();
@@ -1297,11 +1233,11 @@ public partial class MainPage : ContentPage
 
             int n = await _lib.ImportZipAsync(ms);
             RenderLibrary();
-            await Toast($"Importadas {n} figuras");
+            await Toast(Loc.T("import.done.body", n));
         }
         catch (Exception ex)
         {
-            await DisplayAlert("Error al importar", ex.Message, "OK");
+            await DisplayAlert(Loc.T("import.err.title"), ex.Message, Loc.T("ok"));
         }
     }
 
@@ -1317,7 +1253,7 @@ public partial class MainPage : ContentPage
         }
         bool ok = await _ps3.TestAsync();
         SetConnected(ok);
-        if (!ok) await Toast("Sin conexión a la PS3");
+        if (!ok) await Toast(Loc.T("connect.fail.ps3"));
         return ok;
     }
 
@@ -1326,9 +1262,9 @@ public partial class MainPage : ContentPage
         _connected = ok;
         ConnDot.Fill = ok ? Color.FromArgb("#4ade80") : Color.FromArgb("#ef4444");
         ConnText.Text = ok ? AppSettings.Host
-            : (string.IsNullOrWhiteSpace(AppSettings.Host) ? "sin conexión" : "desconectado");
+            : (string.IsNullOrWhiteSpace(AppSettings.Host) ? Loc.T("status.none") : Loc.T("status.disc"));
         if (InstallButton is not null)
-            InstallButton.Text = AppSettings.IsPs4 ? "Instalar PS4" : "Instalar PS3";
+            InstallButton.Text = Loc.T(AppSettings.IsPs4 ? "btn.install.ps4" : "btn.install.ps3");
         if (ok) StartLedPolling();
         else StopLedPolling();
     }

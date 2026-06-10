@@ -26,12 +26,13 @@
                                  Fill="#555" VerticalOptions="Center" />
                         <Label x:Name="ConnText" Text="sin conexión" TextColor="#8a8aa0"
                                FontSize="12" VerticalOptions="Center" Margin="0,0,6,0" />
-                        <Button Text="¿Qué es?" Clicked="OnAbout" Style="{StaticResource Ghost}" />
-                        <Button Text="Importar" Clicked="OnImport" Style="{StaticResource Ghost}" />
+                        <Button x:Name="AboutBtn" Text="¿Qué es?" Clicked="OnAbout" Style="{StaticResource Ghost}" />
+                        <Button x:Name="ImportBtn" Text="Importar" Clicked="OnImport" Style="{StaticResource Ghost}" />
                         <Button x:Name="PlatformButton" Text="Modo: PS3" Clicked="OnTogglePlatform" Style="{StaticResource Ghost}" />
                         <Button x:Name="InstallButton" Text="Instalar" Clicked="OnInstall" Style="{StaticResource Primary}" />
-                        <Button Text="Conectar" Clicked="OnConnect" Style="{StaticResource Ghost}" />
-                        <Button Text="Créditos" Clicked="OnCredits" Style="{StaticResource Ghost}" />
+                        <Button x:Name="ConnectBtn" Text="Conectar" Clicked="OnConnect" Style="{StaticResource Ghost}" />
+                        <Button x:Name="CreditsBtn" Text="Créditos" Clicked="OnCredits" Style="{StaticResource Ghost}" />
+                        <Button x:Name="LangBtn" Text="ES / EN" Clicked="OnToggleLanguage" Style="{StaticResource Ghost}" />
                     </HorizontalStackLayout>
                 </ScrollView>
             </Grid>
@@ -52,8 +53,8 @@
                         </Grid>
 
                         <HorizontalStackLayout Spacing="8" HorizontalOptions="Center">
-                            <Button Text="↻ Sincronizar" Clicked="OnSync" Style="{StaticResource Ghost}" />
-                            <Button Text="Limpiar todo" Clicked="OnClear" Style="{StaticResource Danger}" />
+                            <Button x:Name="SyncBtn" Text="↻ Sincronizar" Clicked="OnSync" Style="{StaticResource Ghost}" />
+                            <Button x:Name="ClearBtn" Text="Limpiar todo" Clicked="OnClear" Style="{StaticResource Danger}" />
                         </HorizontalStackLayout>
 
                         <Label x:Name="HintLabel"
