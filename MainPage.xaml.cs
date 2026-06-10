@@ -610,7 +610,7 @@ public partial class MainPage : ContentPage
         "L1" => (0.266, 0.510, 0.140, 0.150, 35, -16, 0),  // upper-outer
         "L2" => (0.243, 0.686, 0.157, 0.164, 39, -14, 0),  // lower-outer
         "L3" => (0.395, 0.685, 0.147, 0.157, 33,  -9, 0),  // lower-inner
-        "C"  => (0.500, 0.449, 0.212, 0.178, 28,   0, 0),
+        "C"  => (0.505, 0.449, 0.212, 0.178, 28,   0, 0),
         "R1" => (0.734, 0.510, 0.140, 0.150, 35,  16, 0),
         "R2" => (0.767, 0.676, 0.160, 0.180, 43,  15, 0),
         "R3" => (0.614, 0.682, 0.147, 0.153, 31,   9, 0),
@@ -635,19 +635,31 @@ public partial class MainPage : ContentPage
         img.SetBinding(Image.SourceProperty, new Binding(nameof(SlotVm.Thumb)));
         img.SetBinding(IsVisibleProperty, new Binding(nameof(SlotVm.HasThumb)));
 
-        // Remove (X) button, top-right, visible only when slot is filled.
-        var removeBtn = new Button
+        // Remove (X) control. A Button has a large minimum size, so use a small
+        // Border + tap instead. Visible only when filled; top-center on the
+        // round center slot, top-right elsewhere.
+        var removeBtn = new Border
         {
-            Text = "✕", FontSize = 8, FontAttributes = FontAttributes.Bold,
-            TextColor = Color.FromArgb("#ff8a8a"),
+            WidthRequest = 22, HeightRequest = 22, Padding = 0, StrokeThickness = 0,
             BackgroundColor = Color.FromArgb("#cc1a1020"),
-            CornerRadius = 8, Padding = 0,
-            WidthRequest = 15, HeightRequest = 15,
-            HorizontalOptions = LayoutOptions.End, VerticalOptions = LayoutOptions.Start,
-            Margin = new Thickness(0, 1, 1, 0),
+            StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = 11 },
+            HorizontalOptions = center ? LayoutOptions.Center : LayoutOptions.End,
+            VerticalOptions = LayoutOptions.Start,
+            Margin = center ? new Thickness(0, 0, 0, 0) : new Thickness(0, 2, 2, 0),
+            Content = new Label
+            {
+                Text = "✕", FontSize = 12, FontAttributes = FontAttributes.Bold,
+                TextColor = Color.FromArgb("#ffb0b0"),
+                HorizontalTextAlignment = TextAlignment.Center,
+                VerticalTextAlignment = TextAlignment.Center,
+            },
         };
         removeBtn.SetBinding(IsVisibleProperty, new Binding(nameof(SlotVm.Filled)));
-        removeBtn.Clicked += async (_, _) => await RemoveSlotAsync(id);
+        {
+            var rtap = new TapGestureRecognizer();
+            rtap.Tapped += async (_, _) => await RemoveSlotAsync(id);
+            removeBtn.GestureRecognizers.Add(rtap);
+        }
 
         // Thumb fills the slot; the remove (X) button floats on top-right. No
         // name label on the pad itself (it's shown in the library) — keeps the
