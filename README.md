@@ -36,7 +36,7 @@ uploaded anywhere.
 |---|---|---|
 | Jailbreak | HEN 4.91+ or CFW | GoldHEN (Plugin Loader) |
 | FTP | webMAN MOD enabled | GoldHEN FTP enabled |
-| Game | BLUS31473 (US), v1.22, folder or ISO | CUSA00935, updated to 1.23 |
+| Game | BLUS31473 (US), updated to v1.22 | CUSA00935 (US), updated to v1.23 |
 
 ## Usage
 
