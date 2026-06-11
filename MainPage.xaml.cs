@@ -369,6 +369,7 @@ public partial class MainPage : ContentPage
         await Task.Delay(400);
 
         // First thing on first run: let the user pick a language.
+        bool justPickedLang = false;
         if (!AppSettings.LanguageChosen)
         {
             string pick = await DisplayActionSheet("Idioma / Language", null, null,
@@ -379,7 +380,15 @@ public partial class MainPage : ContentPage
             ApplyLanguage();
             RefreshPlatformUi();
             SetConnected(_connected);
+            justPickedLang = true;
         }
+
+        // Right after the language, pick the console so every later message
+        // (setup instructions, About/FAQ) reflects ONLY that console — never
+        // both at once. Also run it on later launches that still lack a saved
+        // connection.
+        if (justPickedLang || string.IsNullOrWhiteSpace(AppSettings.Host))
+            await ChooseConsoleAndConnectAsync();
 
         if (!_lib.HasFigures)
         {
@@ -394,10 +403,6 @@ public partial class MainPage : ContentPage
         {
             if (await _ps3.TestAsync()) { SetConnected(true); await SyncAsync(); }
             else SetConnected(false);
-        }
-        else
-        {
-            await ChooseConsoleAndConnectAsync();
         }
     }
 
@@ -726,7 +731,11 @@ public partial class MainPage : ContentPage
         // Only the STROKE conveys selection/filled state; the BackgroundColor is
         // owned by the per-slot panel light (ApplyLedToSlot), so we never touch
         // it here or we'd clobber the glow.
-        if (selected)
+        // On mobile the frames look cluttered over the real pad image, so hide
+        // them entirely (no stroke at all).
+        if (IsMobile)
+            b.Stroke = new SolidColorBrush(Colors.Transparent);
+        else if (selected)
             b.Stroke = new SolidColorBrush(Color.FromArgb("#f5c518"));
         else if (vm.Filled)
             b.Stroke = new SolidColorBrush(Color.FromArgb("#aaf5c518"));
@@ -1173,13 +1182,15 @@ public partial class MainPage : ContentPage
 
     async void OnAbout(object? sender, EventArgs e)
     {
-        await DisplayAlert(Loc.T("about.title"), Loc.T("about.body"), Loc.T("about.faqbtn"));
+        string suffix = AppSettings.IsPs4 ? ".ps4" : ".ps3";
+        await DisplayAlert(Loc.T("about.title"), Loc.T("about.body" + suffix), Loc.T("about.faqbtn"));
         await OnFaq();
     }
 
     async Task OnFaq()
     {
-        await DisplayAlert(Loc.T("faq.title"), Loc.T("faq.body"), Loc.T("close"));
+        string suffix = AppSettings.IsPs4 ? ".ps4" : ".ps3";
+        await DisplayAlert(Loc.T("faq.title"), Loc.T("faq.body" + suffix), Loc.T("close"));
     }
 
     async void OnCredits(object? sender, EventArgs e)
