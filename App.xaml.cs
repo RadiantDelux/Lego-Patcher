@@ -1,4 +1,4 @@
-﻿namespace ToyPadMaui2;
+﻿namespace ToyPadMaui;
 
 public partial class App : Application
 {
